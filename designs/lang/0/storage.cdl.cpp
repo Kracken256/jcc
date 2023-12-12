@@ -11,6 +11,8 @@
 namespace storage::volatile
 {
     /// @brief SR latch
+    #[EXPORT_ABI "C"]
+    #[CC_OPTIMIZE 0]
     export module srlatch(set:line, en:line, reset:line)(q:line, qn:line)
     {
         tube S1, R1;

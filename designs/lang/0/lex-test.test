@@ -1,0 +1,8 @@
+#[VERSION_MIN "1.0"]
+#[VERSION_MAX "1.0"]
+#[VERSION_RECOMMENDED "1.0"]
+
+#[PROJECT_NAME "Language CDL"]
+#[PROJECT_DATE "2023-12-11"]
+
+#include <statics/math>

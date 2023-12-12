@@ -1,0 +1,54 @@
+[
+  {
+    "type": "keyword",
+    "value": "namespace"
+  },
+  {
+    "type": "identifier",
+    "value": "JXX"
+  },
+  {
+    "type": "separator",
+    "value": "{"
+  },
+  {
+    "type": "keyword",
+    "value": "void"
+  },
+  {
+    "type": "identifier",
+    "value": "myfunction"
+  },
+  {
+    "type": "separator",
+    "value": "("
+  },
+  {
+    "type": "keyword",
+    "value": "void"
+  },
+  {
+    "type": "separator",
+    "value": ")"
+  },
+  {
+    "type": "separator",
+    "value": "{"
+  },
+  {
+    "type": "keyword",
+    "value": "return"
+  },
+  {
+    "type": "separator",
+    "value": ";"
+  },
+  {
+    "type": "separator",
+    "value": "}"
+  },
+  {
+    "type": "separator",
+    "value": "}"
+  }
+]

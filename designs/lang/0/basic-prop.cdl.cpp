@@ -1,0 +1,7 @@
+#[VERSION_MIN "1.0"]
+#[VERSION_RECOMMENDED "1.0"]
+#[PROJECT_NAME "Language CDL"]
+#[PROJECT_DATE "2023-12-11"]
+#[OUTPUT_NAME "basic-prop"]
+#[OUTPUT_STRIP true]
+
