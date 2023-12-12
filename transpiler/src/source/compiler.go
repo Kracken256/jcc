@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
+	"strings"
+
+	"gopkg.in/yaml.v1"
 )
 
 /*
@@ -33,6 +36,7 @@ const (
 	TokenTypeOperator      = 50
 	TokenTypeComment       = 70
 	TokenTypeSeparator     = 80
+	TokenTypeMeta          = 90
 )
 
 var TokenTypes = map[int]string{
@@ -43,6 +47,7 @@ var TokenTypes = map[int]string{
 	TokenTypeOperator:      "Operator",
 	TokenTypeComment:       "Comment",
 	TokenTypeSeparator:     "Separator",
+	TokenTypeMeta:          "Meta",
 }
 
 var LexSeparators = []rune{
@@ -50,15 +55,121 @@ var LexSeparators = []rune{
 }
 
 var LexOperators = []string{
-	"&&", "||", "<=", ">=", "??", "==", "!=", "::", "=", "+", "-", "*", "/", "%", "|", "&", "^", "!", "<", ">", ".", "?", "#", "@//", "@",
+	"::", // namespace
+
+	"+=",  // plus equals
+	"-=",  // minus equals
+	"*=",  // times equals
+	"/=",  // floating divide equals
+	"%=",  // modulus equals
+	"//=", // floor divide equals
+
+	"^^=",  // xor equals
+	"||=",  // or equals
+	"&&=",  // and equals
+	"<<=",  // left shift equals
+	">>=",  // arithmetic right shift equals
+	">>>=", // unsigned right shift equals
+	"|=",   // bitwise or equals
+	"&=",   // bitwise and equals
+	"^=",   // bitwise xor equals
+
+	"<<", // left shift
+	">>", // right shift
+	"==", // equals
+	"!=", // not equals
+	"&&", // and
+	"||", // or
+	"^^", // xor
+	"<=", // less than or equal
+	">=", // greater than or equal
+	"<",  // less than
+	">",  // greater than
+
+	"=", // assign
+	"??",
+	"@",
+
+	"//", // floor divide
+	"++", // increment
+	"--", // decrement
+	"+",  // plus
+	"-",  // minus
+	"*",  // times
+	"&",  // bitwise and
+	"|",  // bitwise or
+	"^",  // bitwise xor
+	"~",  // bitwise not
+	"!",  // not
+
+	"?",      // ternary
+	"#",      // preprocessor
+	".",      // member access
+	",",      // comma
+	"new",    // dynamic allocation
+	"delete", // dynamic deallocation
+
 }
 
 var LexKeywords = []string{
-	"namespace", "include", "export", "module", "on", "for", "switch", "case", "break", "while", "default", "typedef", "template", "contraints", "and", "or", "not", "nor", "nand", "nand", "xor", "xnor", "auto", "true", "false", "on", "off", "high", "low"}
-
-var LexTypesPrimitive = []string{
-	"intn", "string", "bool", "bit", "line", "uintn",
-}
+	"namemap",
+	"namespace",
+	"using",
+	"export",
+	"seal",
+	"unseal",
+	"class",
+	"struct",
+	"union",
+	"typedef",
+	"public",
+	"private",
+	"protected",
+	"claim",
+	"virtual",
+	"abstract",
+	"volatile",
+	"const",
+	"enum",
+	"static_map",
+	"explicit",
+	"extern",
+	"friend",
+	"operator",
+	"this",
+	"constructor",
+	"destructor",
+	"metaclass",
+	"metatype",
+	"metamap",
+	"sizeof",
+	"if",
+	"else",
+	"for",
+	"while",
+	"do",
+	"switch",
+	"return",
+	"fault",
+	"case",
+	"break",
+	"default",
+	"abort",
+	"throw",
+	"continue",
+	"intn",
+	"uintn",
+	"float",
+	"double",
+	"int",
+	"signed",
+	"unsigned",
+	"long",
+	"bool",
+	"bit",
+	"char",
+	"void",
+	"auto"}
 
 var LexIndentifierChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 
@@ -69,14 +180,20 @@ type Attribute struct {
 }
 
 type Token struct {
-	Type  int
-	Value string
+	Type  int    `json:"type"`
+	Value string `json:"value"`
+}
+
+type DebugToken struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 type CompilerUnit struct {
 	FileName   string
 	Tokens     []Token
 	Attributes []Attribute
+	Tree       SyntaxTree
 }
 
 func main() {
@@ -153,58 +270,98 @@ func Compile(inputFiles []string, outputFile string) {
 		// get source code
 		source := GetSource(file)
 
-		// Lex source code
-		tokens := LexSource(source)
+		// preprocess source code
+		preprocessedSource := PreprocessSource(source)
 
-		// ...
+		// debug
+		fmt.Println("==================================================================")
+		fmt.Println("Preprocessed source:")
+		fmt.Println("==================================================================")
+		fmt.Println(preprocessedSource)
+		fmt.Println("==================================================================")
+
+		// Lex source code
+		tokens := LexSource(preprocessedSource)
+
+		// Build abstract syntax tree
+		tree, err := BuildSyntaxTree(tokens)
+		if err != nil {
+			fmt.Println("Error building syntax tree: ", err)
+			os.Exit(1)
+		}
 
 		// Parse attributes
 		attributes := ParseAttributes(tokens)
 
-		units = append(units, CompilerUnit{file, tokens, attributes})
+		units = append(units, CompilerUnit{file, tokens, attributes, tree})
 	}
 
-	// print tokens
-	// for _, fileToken := range units {
-	// 	for _, token := range fileToken.Tokens {
-	// 		fmt.Printf("%s: %s \"%s\"\n", fileToken.FileName, TokenTypes[token.Type], token.Value)
-	// 	}
+	// Okay, we have the AST, now evaluate metacode
+	for _, unit := range units {
+		newtree, err := MetaTreeEval(unit.Tree)
+		if err != nil {
+			fmt.Println("Error evaluating metacode: ", err)
+			os.Exit(1)
+		}
 
-	// 	for _, attribute := range fileToken.Attributes {
-	// 		fmt.Printf("%s: Attribute %s = %s\n", fileToken.FileName, attribute.Name, attribute.Value)
-	// 	}
-	// }
+		// update the tree
+		unit.Tree = newtree
+	}
+
+	// Optimize the AST
+	for _, unit := range units {
+		newtree, err := OptimizeSyntaxTree(unit.Tree, 0)
+		if err != nil {
+			fmt.Println("Error optimizing syntax tree: ", err)
+			os.Exit(1)
+		}
+
+		// update the tree
+		unit.Tree = newtree
+	}
+
+	var srcCodeBlob string
+
+	// Generate code
+	for _, unit := range units {
+		srcCode, err := GenerateCode(unit.Tree)
+		if err != nil {
+			fmt.Println("Error generating code: ", err)
+			os.Exit(1)
+		}
+
+		srcCodeBlob += srcCode
+
+		srcCodeBlob += fmt.Sprintf("\n\n///==================================================================\n/// File: %s\n///==================================================================\n\n", unit.FileName)
+	}
+
+	fmt.Print(srcCodeBlob)
+
+	///================================================================================================
+	// Debug stuff
 
 	// lets convert our attributes to a map and json serialize it
+	var tokens []DebugToken
 
-	var attributes map[string]interface{} = make(map[string]interface{})
 	for _, unit := range units {
-		for _, attribute := range unit.Attributes {
-			if attribute.Type == AttributeTypeString {
-				attributes[attribute.Name] = attribute.Value.(string)
-			} else if attribute.Type == AttributeTypeNumber {
-				i, err := strconv.Atoi(attribute.Value.(string))
-				if err != nil {
-					fmt.Println("Error converting attribute value to number: ", err)
-					os.Exit(1)
-				}
-				attributes[attribute.Name] = i
-			}
+		for _, token := range unit.Tokens {
+			tokens = append(tokens, DebugToken{strings.ToLower(TokenTypes[token.Type]), token.Value})
 		}
 	}
 
-	var serialed []byte
-
-	serialed, err := json.Marshal(attributes)
+	file, err := os.Create(outputFile)
 	if err != nil {
-		fmt.Println("Error serializing attributes: ", err)
+		fmt.Println("Error creating output file: ", err)
 		os.Exit(1)
 	}
 
-	// write to output file
-	err = os.WriteFile(outputFile, serialed, 0644)
+	enc := json.NewEncoder(file)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+
+	err = enc.Encode(tokens)
 	if err != nil {
-		fmt.Println("Error writing output file: ", err)
+		fmt.Println("Error serializing attributes: ", err)
 		os.Exit(1)
 	}
 }
@@ -220,17 +377,80 @@ func GetSource(file string) string {
 }
 
 const (
-	LexStateDefault         = 10
-	LexStateInStringLiteral = 20
-	LexStateInNumberLiteral = 30
-	LexStateInComment       = 40
-	LexStateInIdentifier    = 50
+	LexStateDefault             = 10
+	LexStateInStringLiteral     = 20
+	LexStateInNumberLiteral     = 30
+	LexStateInSingleLineComment = 40
+	LexStateInMultiLineComment  = 50
+	LexStateInIdentifier        = 60
+	LexStateInMeta              = 70
 )
 
 const (
 	LexStateModifierNone           = 10
 	LexStateModifierLiteralEscaped = 20
 )
+
+func CalculateBuildHash(src []byte) string {
+	hash := sha256.Sum256(src)
+	return fmt.Sprintf("J-%x", hash[:][0:8])
+}
+
+func PreprocessSource(source string) string {
+	var newSource string = source
+
+	fmt.Printf("Initial JSRCHASH: %s\n", CalculateBuildHash([]byte(newSource)))
+
+	// lets minify the code
+	// We will lex and rejoin the tokens
+	tokens := LexSource(newSource)
+
+	newSource = ""
+	// rejoing tokens
+	for i, token := range tokens {
+		switch token.Type {
+		case TokenTypeComment:
+			continue
+		case TokenTypeSeparator:
+			newSource += token.Value
+		case TokenTypeOperator:
+			newSource += token.Value
+		case TokenTypeKeyword:
+			// add space if next token is not a separator
+			if len(tokens)-1 > i && tokens[i+1].Type != TokenTypeSeparator {
+				newSource += token.Value + " "
+			} else {
+				newSource += token.Value
+			}
+		case TokenTypeIdentifier:
+			// add space if next token is not a separator
+			if len(tokens)-1 > i && tokens[i+1].Type != TokenTypeSeparator {
+				newSource += token.Value + " "
+			} else {
+				newSource += token.Value
+			}
+		case TokenTypeLiteralNumber:
+			newSource += token.Value
+		case TokenTypeLiteralString:
+			newSource += "\"" + token.Value + "\""
+		case TokenTypeMeta:
+			/// TODO: include files,tags,etc
+			continue
+		default:
+			fmt.Println("Invalid token type: ", token.Type)
+			os.Exit(1)
+		}
+	}
+
+	// lets wrap the code in the JXX:: namespace if it is not already
+	if !strings.HasPrefix(newSource, "namespace JXX{") {
+		newSource = "namespace JXX{" + newSource + "}"
+	}
+
+	fmt.Printf("Final JSRCHASH: %s\n", CalculateBuildHash([]byte(newSource)))
+
+	return newSource
+}
 
 func LexSource(source string) []Token {
 	var tokens []Token
@@ -244,19 +464,24 @@ func LexSource(source string) []Token {
 	for i < len(source) {
 		switch state {
 		case LexStateDefault:
+			// check for meta. Meta begins with a #
+			if source[i] == '#' {
+				state = LexStateInMeta
+				tempChars += string(source[i])
+				i++
+				continue
+			}
+
 			// check for single line comment
 			if len(source)-i >= 2 && source[i:i+2] == "//" {
 				i += 2
-
-				for i < len(source) && source[i] != '\n' {
-					i++
-				}
+				state = LexStateInSingleLineComment
 				continue
 			}
 
 			// check for multi line comment
 			if len(source)-i >= 2 && source[i:i+2] == "/*" {
-				state = LexStateInComment
+				state = LexStateInMultiLineComment
 				i += 2
 				continue
 			}
@@ -309,28 +534,10 @@ func LexSource(source string) []Token {
 			found = false
 			for _, keyword := range LexKeywords {
 				if len(source)-i >= len(keyword) && source[i:i+len(keyword)] == keyword {
-					found = false
-
-					// keyword must be followed by a separator or whitespace
-					if len(source)-i > len(keyword) && source[i+len(keyword)] != ' ' && source[i+len(keyword)] != '\n' && source[i+len(keyword)] != '\t' {
-						found = true
-					}
-
-					if !found {
-						for _, sep := range LexSeparators {
-							if len(source)-i >= len(keyword)+1 && rune(source[i+len(keyword)]) == sep {
-								found = true
-								break
-							}
-						}
-					}
-
-					if found {
-						tokens = append(tokens, Token{TokenTypeKeyword, keyword})
-						i += len(keyword)
-						break
-					}
-
+					tokens = append(tokens, Token{TokenTypeKeyword, keyword})
+					i += len(keyword)
+					found = true
+					break
 				}
 			}
 			if found {
@@ -352,13 +559,40 @@ func LexSource(source string) []Token {
 				continue
 			}
 
+			// check for whitespace
+			if source[i] == ' ' || source[i] == '\t' || source[i] == '\r' || source[i] == '\n' {
+				i++
+				continue
+			}
+
+			// if we get here, we have an invalid character
+			fmt.Println("Lex error: Invalid token: ", string(source[i]))
+			// Dump tokens
+			for _, token := range tokens {
+				fmt.Println(TokenTypes[token.Type], ":", token.Value)
+			}
+			os.Exit(1)
+
+		case LexStateInMeta:
+			if source[i] == '\n' {
+				state = LexStateDefault
+				tokens = append(tokens, Token{TokenTypeMeta, strings.TrimSpace(tempChars)})
+				tempChars = ""
+				i++
+				continue
+			} else {
+				tempChars += string(source[i])
+				i++
+				continue
+			}
+
 		case LexStateInStringLiteral:
 			if modifier == LexStateModifierLiteralEscaped {
 				tempChars += string(source[i])
 				modifier = LexStateModifierNone
 				i++
 				continue
-			} else if source[i] == '\\' {
+			} else if source[i] == '\\' && len(source)-i >= 2 && source[i+1] == '"' {
 				modifier = LexStateModifierLiteralEscaped
 				i++
 				continue
@@ -373,12 +607,28 @@ func LexSource(source string) []Token {
 				i++
 				continue
 			}
-		case LexStateInComment:
+		case LexStateInSingleLineComment:
+			if source[i] != '\n' {
+				tempChars += string(source[i])
+				i++
+				continue
+
+			} else if source[i] == '\n' || i == len(source)-1 {
+				state = LexStateDefault
+				tokens = append(tokens, Token{TokenTypeComment, strings.TrimSpace(tempChars)})
+				tempChars = ""
+				i++
+				continue
+			}
+
+		case LexStateInMultiLineComment:
 			if len(source)-i >= 2 && source[i:i+2] == "*/" {
 				state = LexStateDefault
+				tokens = append(tokens, Token{TokenTypeComment, strings.TrimSpace(tempChars)})
 				i += 2
 				continue
 			} else {
+				tempChars += string(source[i])
 				i++
 				continue
 			}
@@ -412,7 +662,12 @@ func LexSource(source string) []Token {
 			tempChars = ""
 			state = LexStateDefault
 			continue
+
+		default:
+			fmt.Println("Invalid state: ", state)
+			os.Exit(1)
 		}
+
 		i++
 	}
 
@@ -467,4 +722,169 @@ func ParseAttributes(tokens []Token) []Attribute {
 	}
 
 	return attributes
+}
+
+type SyntaxNode struct {
+	Type       int
+	Value      string
+	Attributes []Attribute
+	Children   []SyntaxNode
+}
+
+func (n *SyntaxNode) AddChild(type_ int, value string, attributes []Attribute) {
+	if n.Children == nil {
+		n.Children = make([]SyntaxNode, 0)
+	}
+
+	n.Children = append(n.Children, SyntaxNode{type_, value, attributes, nil})
+}
+
+func (n *SyntaxNode) AddChildNode(node SyntaxNode) {
+	if n.Children == nil {
+		n.Children = make([]SyntaxNode, 0)
+	}
+
+	n.Children = append(n.Children, node)
+}
+
+func (n *SyntaxNode) RemoveChildByIndex(index int) {
+	if index < 0 || index >= len(n.Children) {
+		return
+	}
+
+	n.Children = append(n.Children[:index], n.Children[index+1:]...)
+}
+
+func (n *SyntaxNode) CountChildrenRecursive() int {
+	var count int = 0
+
+	for _, child := range n.Children {
+		count += child.CountChildrenRecursive()
+	}
+
+	return count + len(n.Children)
+}
+
+type SyntaxTree struct {
+	Root SyntaxNode
+}
+
+const (
+	SyntaxTypeDefault    = 0
+	SyntaxTypeStatement  = 10
+	SyntaxTypeExpression = 20
+	SyntaxTypeMeta       = 30
+	SyntaxTypeFunction   = 40
+)
+
+func ParseExpression(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseStatement(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseMeta(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseFunction(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseClass(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseStruct(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseUnion(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseEnum(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseNamespace(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseTypedef(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func ParseBlock(tokens []Token) (SyntaxNode, error) {
+	var node SyntaxNode
+
+	return node, nil
+}
+
+func BuildSyntaxTree(tokens []Token) (SyntaxTree, error) {
+	var tree SyntaxTree
+
+	// Do some basic proprocessing
+
+	// remove comments
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i].Type == TokenTypeComment {
+			tokens = append(tokens[:i], tokens[i+1:]...)
+			i--
+		}
+	}
+
+	// the code already is wrapped in the JXX:: namespace
+	// lets start parsing
+
+	node, err := ParseBlock(tokens)
+
+	if err != nil {
+		return tree, err
+	}
+
+	tree.Root = node
+
+	return tree, nil
+}
+
+func MetaTreeEval(tree SyntaxTree) (SyntaxTree, error) {
+	return tree, nil
+}
+
+func OptimizeSyntaxTree(tree SyntaxTree, level int) (SyntaxTree, error) {
+	return tree, nil
+}
+
+func GenerateCode(tree SyntaxTree) (string, error) {
+	// for now we will output the tree in yaml format
+
+	yaml, err := yaml.Marshal(tree)
+	if err != nil {
+		return "", err
+	}
+
+	return string(yaml), nil
 }
