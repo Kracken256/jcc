@@ -241,6 +241,8 @@ namespace jcc
         std::string m_output_file;
         bool run_job_internal();
     };
+
+    void panic(const std::string &message, std::vector<std::shared_ptr<CompilerMessage>> &messages);
 }
 
 #endif // _JCC_COMPILE_HPP_

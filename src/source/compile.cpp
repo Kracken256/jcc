@@ -9,6 +9,10 @@
 #include <iostream>
 #include <fstream>
 
+#if defined(__linux__)
+#include <execinfo.h>
+#endif
+
 ///=============================================================================
 /// jcc::CompilerMessage class implementation
 ///=============================================================================
@@ -193,48 +197,62 @@ static uint32_t unix_timestamp()
     return (uint32_t)((uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() & 0xFFFFFFFF);
 }
 
-void jcc::CompilerMessage::generate_hash()
+static std::string compute_sha256(const std::string &message)
 {
-    std::string message;
     unsigned char hash[EVP_MAX_MD_SIZE];
-    char binary_portion[12 + 4 + 2 + 4];
-    uint32_t unix_timestamp;
-    uint64_t small_hash = 0;
-    EVP_MD_CTX *mdctx;
-    const EVP_MD *md;
-    unsigned int md_len;
+    EVP_MD_CTX *mdctx = NULL;
+    const EVP_MD *md = NULL;
+    unsigned int md_len = 0;
 
-    message = this->m_message + "::" + this->m_file + "::" + std::to_string(this->m_line) + "::" + std::to_string(this->m_column) + "::";
-
-    md = EVP_get_digestbyname("sha3-256");
+    md = EVP_get_digestbyname("sha256");
 
     if (!md)
     {
-        throw std::runtime_error("jcc::CompilerMessage::generate_hash(): Unable to get digest");
+        std::cerr << "jcc::compute_sha256(): Unable to get digest by name" << std::endl;
+        std::terminate();
     }
 
     mdctx = EVP_MD_CTX_new();
     if (!mdctx)
     {
-        throw std::runtime_error("jcc::CompilerMessage::generate_hash(): Unable to create digest context");
+        std::cerr << "jcc::compute_sha256(): Unable to create digest context" << std::endl;
+        std::terminate();
     }
 
     if (1 != EVP_DigestInit_ex(mdctx, md, NULL))
     {
-        throw std::runtime_error("jcc::CompilerMessage::generate_hash(): Unable to initialize digest");
+        std::cerr << "jcc::compute_sha256(): Unable to initialize digest" << std::endl;
+        std::terminate();
     }
 
-    if (1 != EVP_DigestUpdate(mdctx, message.c_str(), message.length()))
+    if (1 != EVP_DigestUpdate(mdctx, message.c_str(), message.size()))
     {
-        throw std::runtime_error("jcc::CompilerMessage::generate_hash(): Unable to update digest");
+        std::cerr << "jcc::compute_sha256(): Unable to update digest" << std::endl;
+        std::terminate();
     }
 
     if (1 != EVP_DigestFinal_ex(mdctx, hash, &md_len))
     {
-        throw std::runtime_error("jcc::CompilerMessage::generate_hash(): Unable to finalize digest");
+        std::cerr << "jcc::compute_sha256(): Unable to finalize digest" << std::endl;
+        std::terminate();
     }
 
     EVP_MD_CTX_free(mdctx);
+
+    return std::string((char *)hash, md_len);
+}
+
+void jcc::CompilerMessage::generate_hash()
+{
+    std::string message;
+    std::string hash;
+    char binary_portion[12 + 4 + 2 + 4];
+    uint32_t unix_timestamp;
+    uint64_t small_hash = 0;
+
+    message = this->m_message + "::" + this->m_file + "::" + std::to_string(this->m_line) + "::" + std::to_string(this->m_column) + "::";
+
+    hash = compute_sha256(message);
 
     for (int i = 0; i < 8; i++)
     {
@@ -245,7 +263,7 @@ void jcc::CompilerMessage::generate_hash()
 
     unix_timestamp = ::unix_timestamp();
 
-    memcpy(binary_portion, hash, 12);
+    memcpy(binary_portion, hash.c_str(), 12);
     binary_portion[12] = unix_timestamp & 0xFF;
     binary_portion[13] = (unix_timestamp >> 8) & 0xFF;
     binary_portion[14] = (unix_timestamp >> 16) & 0xFF;
@@ -365,7 +383,7 @@ bool jcc::CompilationUnit::build()
     this->m_success = false;
 
     /// TODO: implement
-    this->push_message(CompilerMessageType::Warning, "Compiler not implemented yet");
+    // this->push_message(CompilerMessageType::Warning, "Compiler not implemented yet");
 
     for (const auto &file : this->m_files)
     {
@@ -465,7 +483,7 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
     {
         this->push_message(CompilerMessageType::Warning, "File '" + filepath + "' is empty");
         file.close();
-        return false;
+        return true;
     }
 
     if (sizepos == INT64_MAX)
@@ -477,7 +495,7 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
 
     file.seekg(0, std::ios::beg);
 
-    source_code.reserve(sizepos);
+    source_code.resize(sizepos);
 
     if (!file.read(source_code.data(), sizepos))
     {
@@ -500,17 +518,19 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
 
 bool jcc::CompilationUnit::compile_file(const std::string &file)
 {
-    /// TOOD: implement
-
     std::string source_code;
     TokenList tokens;
-
-    (void)file;
 
     if (!read_source_code(file, source_code))
     {
         this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
         return false;
+    }
+
+    if (source_code.empty())
+    {
+        this->push_message(CompilerMessageType::Info, "Disregarding empty file '" + file + "'");
+        return true;
     }
 
     try
@@ -520,12 +540,27 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     catch (const LexerException &e)
     {
         this->push_message(CompilerMessageType::Error, "Lexer::lex(" + std::string(e.what()) + ")");
+        return false;
+    }
+    catch (const std::exception &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Internal compiler error: Lexer::lex(" + std::string(e.what()) + ")");
+        panic("Caught unexpected exception in Lexer::lex()", this->m_messages);
+        return false;
     }
 
     /// TODO: remove after debugging
     std::cout << tokens.to_string() << std::endl;
 
-    return false;
+    /// TODO: Implement parser
+
+    /// TODO: Implement semantic analyzer
+
+    /// TODO: Implement AST optimizer
+
+    /// TODO: Implement code generator
+
+    return true;
 }
 
 bool jcc::CompilationUnit::success() const
@@ -720,4 +755,74 @@ bool jcc::CompilationJob::success() const
     }
 
     return true;
+}
+
+///=============================================================================
+/// jcc standalone functions
+///=============================================================================
+
+#if defined(__linux__)
+static void print_stacktrace()
+{
+    std::cerr << "Stacktrace:" << std::endl;
+
+    void *array[128];
+    size_t size;
+
+    size = backtrace(array, 128);
+
+    char **strings = backtrace_symbols(array, size);
+
+    for (size_t i = 0; i < size; i++)
+    {
+        // std::cerr << strings[i] << std::endl;
+        std::cerr << "\x1b[37;49m" << strings[i] << "\x1b[0m" << std::endl;
+    }
+
+    free(strings);
+}
+#else
+static void print_stacktrace()
+{
+    std::cerr << "Stacktrace: Not implemented for this platform" << std::endl;
+}
+#endif
+
+void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::CompilerMessage>> &messages)
+{
+    static std::atomic<bool> panic_called = false;
+
+    if (panic_called)
+    {
+        while (1)
+        {
+        }
+    }
+
+    panic_called = true;
+
+    std::stringstream autoreport_id;
+
+    for (const auto &message : messages)
+    {
+        std::cerr << message->ansi_message() << std::endl;
+
+        autoreport_id << message->message_raw() << "::";
+    }
+
+    std::cerr << '\n';
+
+    std::cerr << "\x1b[31;49;1;4m[ INTERNAL COMPILER ERROR ]\x1b[0m: \x1b[36;49;1;4m" << message << "\x1b[0m\n"
+              << std::endl;
+
+    print_stacktrace();
+
+    std::cerr
+        << "\x1b[32;49mPlease report this error to the JCC developers\x1b[0m" << std::endl;
+
+    // calculate autoreport id
+    std::cerr << "\x1b[32;49mAutoreport ID:\x1b[0m \x1b[36;49;4m"
+              << "JCR0-" + base58_encode(compute_sha256(autoreport_id.str())) << "\x1b[0m" << std::endl;
+
+    _exit(0);
 }

@@ -3,6 +3,10 @@
 #include <iostream>
 #include <filesystem>
 #include <memory>
+#include <thread>
+#include <openssl/crypto.h>
+#include <mutex>
+#include <functional>
 #include "lexer.hpp"
 #include "compile.hpp"
 #include <algorithm>
@@ -10,6 +14,30 @@
 using namespace jcc;
 
 typedef std::vector<std::string> StringVector;
+
+std::vector<std::shared_ptr<std::mutex>> mutexes;
+
+// OpenSSL locking function callback
+void openssl_locking_function(int mode, int n, const char *file, int line)
+{
+    (void)(file);
+    (void)(line);
+
+    if (mode & CRYPTO_LOCK)
+    {
+        mutexes[n]->lock();
+    }
+    else
+    {
+        mutexes[n]->unlock();
+    }
+}
+
+// OpenSSL thread ID callback
+unsigned long openssl_thread_id_function()
+{
+    return std::hash<std::thread::id>()(std::this_thread::get_id());
+}
 
 enum JccModeFlags
 {
@@ -114,6 +142,12 @@ bool parse_arguments(StringVector args, JccMode &mode)
         }
         else
         {
+            if (!it->ends_with(".j"))
+            {
+                print_error("file '" + *it + "' is not a j source file. j source files must end with '.j'");
+                return false;
+            }
+
             if (!std::filesystem::exists(*it))
             {
                 print_error("file '" + *it + "' does not exist");
@@ -194,6 +228,14 @@ int main(int argc, char **argv)
     {
         return 1;
     }
+
+    // Initialize mutexes
+    int num_locks = CRYPTO_num_locks();
+    mutexes.resize(num_locks);
+
+    // Set up OpenSSL thread callbacks
+    CRYPTO_set_locking_callback(openssl_locking_function);
+    CRYPTO_set_id_callback(openssl_thread_id_function);
 
     CompilationJob job;
 

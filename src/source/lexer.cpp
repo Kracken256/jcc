@@ -166,6 +166,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
     result.push_back(Token(TokenType::Punctuator, "{"));
     result.push_back(Token(TokenType::Punctuator, "}"));
     
+    throw std::runtime_error("lexer is not implemented");
 
     return result;
 }
