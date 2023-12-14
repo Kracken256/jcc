@@ -188,9 +188,9 @@ static std::string base58_encode(const std::string &input)
     return output;
 }
 
-uint32_t unix_timestamp()
+static uint32_t unix_timestamp()
 {
-    return (uint32_t)time(NULL);
+    return (uint32_t)((uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() & 0xFFFFFFFF);
 }
 
 void jcc::CompilerMessage::generate_hash()
@@ -386,7 +386,6 @@ static bool is_valid_utf8(const std::string &input)
     if (input.empty())
         return true;
 
-    // const unsigned char * bytes = (const unsigned char *)string;
     size_t i = 0;
     unsigned int cp;
     int num;
