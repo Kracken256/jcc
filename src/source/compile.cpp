@@ -404,48 +404,46 @@ static bool is_valid_utf8(const std::string &input)
     if (input.empty())
         return true;
 
-    size_t i = 0;
+    const unsigned char * bytes = (const unsigned char *)input.c_str();
     unsigned int cp;
     int num;
 
-    while (i < input.size())
+    while (*bytes != 0x00)
     {
-        unsigned char cb = input[i];
-
-        if ((cb & 0x80) == 0x00)
+        if ((*bytes & 0x80) == 0x00)
         {
-            // U+0000 to U+007F
-            cp = (cb & 0x7F);
+            // U+0000 to U+007F 
+            cp = (*bytes & 0x7F);
             num = 1;
         }
-        else if ((cb & 0xE0) == 0xC0)
+        else if ((*bytes & 0xE0) == 0xC0)
         {
-            // U+0080 to U+07FF
-            cp = (cb & 0x1F);
+            // U+0080 to U+07FF 
+            cp = (*bytes & 0x1F);
             num = 2;
         }
-        else if ((cb & 0xF0) == 0xE0)
+        else if ((*bytes & 0xF0) == 0xE0)
         {
-            // U+0800 to U+FFFF
-            cp = (cb & 0x0F);
+            // U+0800 to U+FFFF 
+            cp = (*bytes & 0x0F);
             num = 3;
         }
-        else if ((cb & 0xF8) == 0xF0)
+        else if ((*bytes & 0xF8) == 0xF0)
         {
-            // U+10000 to U+10FFFF
-            cp = (cb & 0x07);
+            // U+10000 to U+10FFFF 
+            cp = (*bytes & 0x07);
             num = 4;
         }
         else
             return false;
 
-        i += 1;
+        bytes += 1;
         for (int i = 1; i < num; ++i)
         {
-            if ((cb & 0xC0) != 0x80)
+            if ((*bytes & 0xC0) != 0x80)
                 return false;
-            cp = (cp << 6) | (cb & 0x3F);
-            i += 1;
+            cp = (cp << 6) | (*bytes & 0x3F);
+            bytes += 1;
         }
 
         if ((cp > 0x10FFFF) ||
@@ -525,6 +523,20 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     {
         this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
         return false;
+    }
+
+    bool found_non_ascii = false;
+    for (const auto &c : source_code)
+    {
+        if (c & 0x80)
+        {
+            found_non_ascii = true;
+            break;
+        }
+    }
+    if (found_non_ascii)
+    {
+        this->push_message(CompilerMessageType::Info, "File contains non-ASCII characters. This is fine, just a heads up.");
     }
 
     if (source_code.empty())
