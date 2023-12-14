@@ -812,7 +812,7 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
 
     std::cerr << '\n';
 
-    std::cerr << "\x1b[31;49;1;4m[ INTERNAL COMPILER ERROR ]\x1b[0m: \x1b[36;49;1;4m" << message << "\x1b[0m\n"
+    std::cerr << "\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1;4m" << message << "\x1b[0m\n"
               << std::endl;
 
     print_stacktrace();

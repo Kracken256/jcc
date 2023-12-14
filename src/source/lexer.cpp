@@ -125,6 +125,10 @@ std::string jcc::TokenList::to_string() const
 
     for (size_t i = 0; i < m_tokens.size(); i++)
     {
+        if (m_tokens[i].type() == TokenType::Whitespace || m_tokens[i].type() == TokenType::SingleLineComment || m_tokens[i].type() == TokenType::MultiLineComment)
+        {
+            continue;
+        }
         result += m_tokens[i].to_string();
 
         if (i != m_tokens.size() - 1)
@@ -177,13 +181,24 @@ enum class LexerStateModifier
 {
     None,
     StringEscape,
+    StringSingleQuote,
+    StringSingleQuoteEscape
 };
 
-static std::set<char> lexSeperators = {'(', ')', '{', '}', '[', ']', ';', ',', ':'};
+static std::vector<std::string> lexSeperators = {
+    "(",  // left parenthesis
+    ")",  // right parenthesis
+    "{",  // left brace
+    "}",  // right brace
+    "[",  // left bracket
+    "]",  // right bracket
+    ";",  // semicolon
+    ",",  // comma
+    "::", // scope resolution
+    ":",  // colon
+};
 
-static std::set<std::string> lexOperators = {
-    "::", // namespace
-
+static std::vector<std::string> lexOperators = {
     "+=",  // plus equals
     "-=",  // minus equals
     "*=",  // times equals
@@ -328,7 +343,6 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
         switch (state)
         {
         case LexerState::Default:
-
             // Check for single line comment
             if (src_length - i >= 2 && current_char == '/' && source[i + 1] == '/')
             {
@@ -344,13 +358,6 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                 state = LexerState::MultiLineComment;
                 i++;
                 column++;
-                break;
-            }
-
-            // Check for separator
-            if (lexSeperators.find(current_char) != lexSeperators.end())
-            {
-                result.push_back(Token(TokenType::Punctuator, std::string(1, current_char)));
                 break;
             }
 
@@ -371,10 +378,34 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                 break;
             }
 
-            // Check for string literal
+            // // Check for Punctuator
+            found = false;
+            for (const auto &sep : lexSeperators)
+            {
+                if (src_length - i >= sep.length() && source.substr(i, sep.length()) == sep)
+                {
+                    result.push_back(Token(TokenType::Punctuator, sep));
+                    i += sep.length() - 1;
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+            {
+                break;
+            }
+
+            // Check for string literals
             if (current_char == '"')
             {
                 state = LexerState::StringLiteral;
+                modifier = LexerStateModifier::None;
+                break;
+            }
+            else if (current_char == '\'')
+            {
+                state = LexerState::StringLiteral;
+                modifier = LexerStateModifier::StringSingleQuote;
                 break;
             }
 
@@ -421,8 +452,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
             if (std::isspace(current_char))
             {
                 state = LexerState::Whitespace;
-                current_token += current_char;
-                break;
+                continue;
             }
 
             // invalid state
@@ -430,52 +460,107 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
 
             break;
         case LexerState::StringLiteral:
-            if (modifier == LexerStateModifier::StringEscape)
+            if (current_char == '\n' || src_length - i == 0)
             {
-                switch (current_char)
-                {
-                case 'n':
-                    current_token += '\n';
-                    break;
-                case 't':
-                    current_token += '\t';
-                    break;
-                case 'r':
-                    current_token += '\r';
-                    break;
-                case '0':
-                    current_token += '\0';
-                    break;
-                case '\\':
-                    current_token += '\\';
-                    break;
+                throw LexerExceptionInvalidLiteral("String literal not terminated. Expected '\"' at line " + std::to_string(line) + ", column " + std::to_string(column));
+            }
 
-                default:
-                    current_token += current_char;
-                    break;
+            if (modifier == LexerStateModifier::StringSingleQuote || modifier == LexerStateModifier::StringSingleQuoteEscape)
+            {
+                if (modifier == LexerStateModifier::StringSingleQuoteEscape)
+                {
+                    switch (current_char)
+                    {
+                    case 'n':
+                        current_token += '\n';
+                        break;
+                    case 't':
+                        current_token += '\t';
+                        break;
+                    case 'r':
+                        current_token += '\r';
+                        break;
+                    case '0':
+                        current_token += '\0';
+                        break;
+                    case '\\':
+                        current_token += '\\';
+                        break;
+
+                    default:
+                        current_token += current_char;
+                        break;
+                    }
+                    modifier = LexerStateModifier::StringSingleQuote;
                 }
-                modifier = LexerStateModifier::None;
-            }
-            else if (current_char == '\\')
-            {
-                modifier = LexerStateModifier::StringEscape;
-            }
-            else if (current_char == '"')
-            {
-                result.push_back(Token(TokenType::StringLiteral, current_token));
-                current_token = "";
-                state = LexerState::Default;
+                else if (current_char == '\\')
+                {
+                    modifier = LexerStateModifier::StringSingleQuoteEscape;
+                }
+                else if (current_char == '\'')
+                {
+                    result.push_back(Token(TokenType::StringLiteral, current_token));
+                    current_token = "";
+                    state = LexerState::Default;
+                    modifier = LexerStateModifier::None;
+                }
+                else
+                {
+                    current_token += current_char;
+                }
+
+                break;
             }
             else
             {
-                current_token += current_char;
+
+                if (modifier == LexerStateModifier::StringEscape)
+                {
+                    switch (current_char)
+                    {
+                    case 'n':
+                        current_token += '\n';
+                        break;
+                    case 't':
+                        current_token += '\t';
+                        break;
+                    case 'r':
+                        current_token += '\r';
+                        break;
+                    case '0':
+                        current_token += '\0';
+                        break;
+                    case '\\':
+                        current_token += '\\';
+                        break;
+
+                    default:
+                        current_token += current_char;
+                        break;
+                    }
+                    modifier = LexerStateModifier::None;
+                }
+                else if (current_char == '\\')
+                {
+                    modifier = LexerStateModifier::StringEscape;
+                }
+                else if (current_char == '"')
+                {
+                    result.push_back(Token(TokenType::StringLiteral, current_token));
+                    current_token = "";
+                    state = LexerState::Default;
+                }
+                else
+                {
+                    current_token += current_char;
+                }
             }
             break;
         case LexerState::NumberLiteral:
             /* code */
             break;
         case LexerState::SingleLineComment:
-            if (current_char != '\n')
+            if (current_char != '\n' || src_length - i == 0)
             {
                 current_token += current_char;
             }
@@ -484,6 +569,9 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                 result.push_back(Token(TokenType::SingleLineComment, current_token));
                 current_token = "";
                 state = LexerState::Default;
+                line++;
+                column = 1;
+                continue;
             }
             break;
         case LexerState::MultiLineComment:
@@ -516,6 +604,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                 result.push_back(Token(TokenType::Identifier, current_token));
                 current_token = "";
                 state = LexerState::Default;
+                i--;
             }
             else
             {
@@ -529,14 +618,6 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
             /* code */
             break;
         case LexerState::Whitespace:
-
-            // handle newlines
-            if (current_char == '\n')
-            {
-                line++;
-                column = 1;
-            }
-
             if (!std::isspace(current_char))
             {
                 result.push_back(Token(TokenType::Whitespace, current_token));
@@ -547,6 +628,15 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
             else
             {
                 current_token += current_char;
+            }
+
+            // handle newlines
+            if (current_char == '\n')
+            {
+                line++;
+                column = 1;
+                i++;
+                continue;
             }
 
             break;
@@ -565,7 +655,12 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
         switch (state)
         {
         case LexerState::StringLiteral:
-            throw LexerExceptionInvalidLiteral("String literal not terminated. Expected '\"' at line " + std::to_string(line) + ", column " + std::to_string(column));
+            if (modifier == LexerStateModifier::StringSingleQuote || modifier == LexerStateModifier::StringSingleQuoteEscape)
+            {
+                throw LexerExceptionInvalidLiteral("String literal not terminated. Expected \"'\" at line " + std::to_string(line) + ", column " + std::to_string(column));
+            } else {
+                throw LexerExceptionInvalidLiteral("String literal not terminated. Expected '\"' at line " + std::to_string(line) + ", column " + std::to_string(column));
+            }
             break;
         case LexerState::NumberLiteral:
             throw LexerExceptionInvalidLiteral("Number literal not valid at line " + std::to_string(line) + ", column " + std::to_string(column));
@@ -584,9 +679,6 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
             break;
         case LexerState::Punctuator:
             throw LexerExceptionInvalidPunctuator("Invalid punctuator \"" + current_token + "\" at line " + std::to_string(line) + ", column " + std::to_string(column));
-            break;
-        case LexerState::Whitespace:
-            throw LexerExceptionInvalid("Invalid whitespace \"" + current_token + "\" at line " + std::to_string(line) + ", column " + std::to_string(column));
             break;
 
         default:
