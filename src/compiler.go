@@ -179,6 +179,22 @@ var LexKeywords = []string{
 	"void",
 	"auto"}
 
+var LexBuiltinTypes = []string{
+	"intn",   // Minimum width integer
+	"uintn",  // Minimum width unsigned integer
+	"float",  // 32 bit floating point
+	"double", // 64 bit floating point
+	"byte",   // 8 bit integer unsigned
+	"char",   // 8 bit integer signed
+	"word",   // 16 bit integer unsigned
+	"short",  // 16 bit integer signed
+	"dword",  // 32 bit integer unsigned
+	"int",    // 32 bit integer signed
+	"qword",  // 64 bit integer unsigned
+	"long",   // 64 bit integer signed
+	"bool",   // boolean
+}
+
 var LexIndentifierChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 
 type Attribute struct {
@@ -307,7 +323,7 @@ func Compile(inputFiles []string, outputFile string) {
 		}
 
 		// Build abstract syntax tree
-		tree, err := BuildSyntaxTree(tokens)
+		tree, err := BuildSyntaxTree(&tokens)
 		if err != nil {
 			fmt.Println("Error building syntax tree: ", err)
 			os.Exit(1)
@@ -327,7 +343,7 @@ func Compile(inputFiles []string, outputFile string) {
 			os.Exit(1)
 		}
 
-		units = append(units, CompilerUnit{file, tokens, attributes, tree})
+		units = append(units, CompilerUnit{file, tokens.tokens, attributes, tree})
 	}
 
 	var srcCodeBlob string
@@ -420,7 +436,9 @@ func PreprocessSource(source string) (string, error) {
 
 	newSource = ""
 	// rejoing tokens
-	for i, token := range tokens {
+	for i := 0; i < tokens.Len(); i++ {
+		var token Token = tokens.PeekAt(i)
+
 		switch token.Type {
 		case TokenTypeComment:
 			continue
@@ -430,14 +448,14 @@ func PreprocessSource(source string) (string, error) {
 			newSource += token.Value
 		case TokenTypeKeyword:
 			// add space if next token is not a separator
-			if len(tokens)-1 > i && tokens[i+1].Type != TokenTypeSeparator {
+			if tokens.Len()-1 > i && tokens.PeekAt(i+1).Type != TokenTypeSeparator {
 				newSource += token.Value + " "
 			} else {
 				newSource += token.Value
 			}
 		case TokenTypeIdentifier:
 			// add space if next token is not a separator
-			if len(tokens)-1 > i && tokens[i+1].Type != TokenTypeSeparator {
+			if tokens.Len()-1 > i && tokens.PeekAt(i+1).Type != TokenTypeSeparator && tokens.PeekAt(i+1).Type != TokenTypeOperator {
 				newSource += token.Value + " "
 			} else {
 				newSource += token.Value
@@ -455,22 +473,22 @@ func PreprocessSource(source string) (string, error) {
 		}
 	}
 
-	// lets wrap the code in the JXX:: namespace if it is not already
-	if !strings.HasPrefix(newSource, "namespace JXX{") {
-		newSource = "namespace JXX{" + newSource + "}"
-	}
+	// // lets wrap the code in the JXX:: namespace if it is not already
+	// if !strings.HasPrefix(newSource, "namespace JXX{") {
+	// 	newSource = "namespace JXX{" + newSource + "}"
+	// }
 
 	fmt.Printf("Final JSRCHASH: %s\n", CalculateBuildHash([]byte(newSource)))
 
 	return newSource, nil
 }
 
-func LexMetaSource(tokens []Token) ([]Attribute, []Token, error) {
+func LexMetaSource(tokens Tokens) ([]Attribute, Tokens, error) {
 	var attributes []Attribute
 	var i int = 0
 
-	for i < len(tokens) {
-		var token = tokens[i]
+	for i < tokens.Len() {
+		var token = tokens.PeekAt(i)
 
 		if token.Type != TokenTypeMeta {
 			i++
@@ -480,19 +498,19 @@ func LexMetaSource(tokens []Token) ([]Attribute, []Token, error) {
 		// #[NAME VALUE]
 
 		if len(token.Value) < 3 {
-			return nil, nil, fmt.Errorf("invalid meta token: %s. Expected #[NAME VALUE]", token.Value)
+			return nil, tokens, fmt.Errorf("invalid meta token: %s. Expected #[NAME VALUE]", token.Value)
 		}
 
 		if token.Value[0] != '#' {
-			return nil, nil, fmt.Errorf("invalid meta token: %s. Expected #", token.Value)
+			return nil, tokens, fmt.Errorf("invalid meta token: %s. Expected #", token.Value)
 		}
 
 		if token.Value[1] != '[' {
-			return nil, nil, fmt.Errorf("invalid meta token: %s. Expected [", token.Value)
+			return nil, tokens, fmt.Errorf("invalid meta token: %s. Expected [", token.Value)
 		}
 
 		if token.Value[len(token.Value)-1] != ']' {
-			return nil, nil, fmt.Errorf("invalid meta token: %s. Expected ]", token.Value)
+			return nil, tokens, fmt.Errorf("invalid meta token: %s. Expected ]", token.Value)
 		}
 
 		var name string
@@ -508,7 +526,7 @@ func LexMetaSource(tokens []Token) ([]Attribute, []Token, error) {
 				}
 			} else {
 				if token.Value[i] == ' ' {
-					return nil, nil, fmt.Errorf("invalid meta token: %s. Expected ]", token.Value)
+					return nil, tokens, fmt.Errorf("invalid meta token: %s. Expected ]", token.Value)
 				}
 				value = token.Value[i : len(token.Value)-1]
 				break
@@ -522,7 +540,8 @@ func LexMetaSource(tokens []Token) ([]Attribute, []Token, error) {
 		}
 
 		// remove the meta token
-		tokens = append(tokens[:i], tokens[i+1:]...)
+		// tokens = append(tokens[:i], tokens[i+1:]...)
+		tokens.PopAt(i)
 	}
 
 	return attributes, tokens, nil
@@ -691,8 +710,8 @@ func ExtractStringLiteral(value string) (string, error) {
 	return "", errors.New("invalid string literal")
 }
 
-func LexSource(source string) []Token {
-	var tokens []Token
+func LexSource(source string) Tokens {
+	var tokens Tokens
 	var tempChars string
 	var i int = 0
 	var state int = LexStateDefault
@@ -729,7 +748,7 @@ func LexSource(source string) []Token {
 			var found bool = false
 			for _, sep := range LexSeparators {
 				if rune(source[i]) == sep {
-					tokens = append(tokens, Token{TokenTypeSeparator, string(source[i])})
+					tokens.PushBack(Token{TokenTypeSeparator, string(source[i])})
 					i++
 					found = true
 					break
@@ -744,21 +763,13 @@ func LexSource(source string) []Token {
 			found = false
 			for _, op := range LexOperators {
 				if len(source)-i >= len(op) && source[i:i+len(op)] == op {
-					tokens = append(tokens, Token{TokenTypeOperator, op})
+					tokens.PushBack(Token{TokenTypeOperator, op})
 					i += len(op)
 					found = true
 					break
 				}
 			}
 			if found {
-				continue
-			}
-
-			// check for number literal
-			if source[i] >= '0' && source[i] <= '9' {
-				state = LexStateInNumberLiteral
-				tempChars += string(source[i])
-				i++
 				continue
 			}
 
@@ -773,7 +784,7 @@ func LexSource(source string) []Token {
 			found = false
 			for _, keyword := range LexKeywords {
 				if len(source)-i >= len(keyword) && source[i:i+len(keyword)] == keyword {
-					tokens = append(tokens, Token{TokenTypeKeyword, keyword})
+					tokens.PushBack(Token{TokenTypeKeyword, keyword})
 					i += len(keyword)
 					found = true
 					break
@@ -785,7 +796,12 @@ func LexSource(source string) []Token {
 
 			// check for identifier
 			found = false
-			for _, char := range LexIndentifierChars {
+			for j, char := range LexIndentifierChars {
+				// first character must be a letter or underscore
+				if j == 0 && (source[i] < 'a' || source[i] > 'z') && (source[i] < 'A' || source[i] > 'Z') && source[i] != '_' {
+					break
+				}
+
 				if rune(source[i]) == char {
 					state = LexStateInIdentifier
 					tempChars += string(source[i])
@@ -798,6 +814,14 @@ func LexSource(source string) []Token {
 				continue
 			}
 
+			// check for number literal
+			if (source[i] >= '0' && source[i] <= '9') || source[i] == '-' || source[i] == '+' || source[i] == 'e' {
+				state = LexStateInNumberLiteral
+				tempChars += string(source[i])
+				i++
+				continue
+			}
+
 			// check for whitespace
 			if source[i] == ' ' || source[i] == '\t' || source[i] == '\r' || source[i] == '\n' {
 				i++
@@ -807,8 +831,12 @@ func LexSource(source string) []Token {
 			// if we get here, we have an invalid character
 			fmt.Println("Lex error: Invalid token: ", string(source[i]))
 			// Dump tokens
-			for _, token := range tokens {
-				fmt.Println(TokenTypes[token.Type], ":", token.Value)
+			// for _, token := range tokens {
+			// 	fmt.Println(TokenTypes[token.Type], ":", token.Value)
+			// }
+			for i < tokens.Len() {
+				fmt.Println(TokenTypes[tokens.PeekAt(i).Type], ":", tokens.PeekAt(i).Value)
+				i++
 			}
 			os.Exit(1)
 
@@ -882,7 +910,7 @@ func LexSource(source string) []Token {
 					tempChars = tempChars[:len(name)+3] + converted
 				}
 
-				tokens = append(tokens, Token{TokenTypeMeta, strings.TrimSpace(tempChars) + "]"})
+				tokens.PushBack(Token{TokenTypeMeta, strings.TrimSpace(tempChars) + "]"})
 				tempChars = ""
 				state = LexStateDefault
 				modifier = LexStateModifierNone
@@ -915,7 +943,7 @@ func LexSource(source string) []Token {
 				i++
 				continue
 			} else if source[i] == '"' {
-				tokens = append(tokens, Token{TokenTypeLiteralString, tempChars})
+				tokens.PushBack(Token{TokenTypeLiteralString, tempChars})
 				tempChars = ""
 				state = LexStateDefault
 				i++
@@ -931,7 +959,7 @@ func LexSource(source string) []Token {
 				i++
 			} else {
 				state = LexStateDefault
-				tokens = append(tokens, Token{TokenTypeComment, strings.TrimSpace(tempChars)})
+				tokens.PushBack(Token{TokenTypeComment, strings.TrimSpace(tempChars)})
 				tempChars = ""
 				i++
 				continue
@@ -940,7 +968,7 @@ func LexSource(source string) []Token {
 		case LexStateInMultiLineComment:
 			if len(source)-i >= 2 && source[i:i+2] == "*/" {
 				state = LexStateDefault
-				tokens = append(tokens, Token{TokenTypeComment, strings.TrimSpace(tempChars)})
+				tokens.PushBack(Token{TokenTypeComment, strings.TrimSpace(tempChars)})
 				i += 2
 				continue
 			} else {
@@ -949,14 +977,86 @@ func LexSource(source string) []Token {
 				continue
 			}
 		case LexStateInNumberLiteral:
-			if source[i] >= '0' && source[i] <= '9' {
+			if len(tempChars) == 1 {
 				tempChars += string(source[i])
 				i++
 				continue
-			} else {
-				tokens = append(tokens, Token{TokenTypeLiteralNumber, tempChars})
-				tempChars = ""
-				state = LexStateDefault
+			}
+
+			switch tempChars[0] {
+			case '0':
+				if len(tempChars) >= 2 && tempChars[1] == 'x' {
+					if source[i] >= '0' && source[i] <= '9' || source[i] >= 'a' && source[i] <= 'f' || source[i] >= 'A' && source[i] <= 'F' {
+						tempChars += string(source[i])
+						i++
+						continue
+					} else if len(tempChars) == 2 {
+						fmt.Println("Lex error: Invalid hex number literal: ", tempChars)
+						os.Exit(1)
+						continue
+					} else {
+						tokens.PushBack(Token{TokenTypeLiteralNumber, tempChars})
+						tempChars = ""
+						state = LexStateDefault
+						continue
+					}
+				} else if len(tempChars) >= 2 && tempChars[1] == 'b' {
+					if source[i] == '0' || source[i] == '1' {
+						tempChars += string(source[i])
+						i++
+						continue
+					} else if len(tempChars) == 2 {
+						fmt.Println("Lex error: Invalid binary number literal: ", tempChars)
+						os.Exit(1)
+						continue
+					} else {
+						tokens.PushBack(Token{TokenTypeLiteralNumber, tempChars})
+						tempChars = ""
+						state = LexStateDefault
+						continue
+					}
+				} else if len(tempChars) >= 2 && tempChars[1] == 'o' {
+					if source[i] >= '0' && source[i] <= '7' {
+						tempChars += string(source[i])
+						i++
+						continue
+					} else {
+						fmt.Println("Lex error: Invalid octal number literal: ", tempChars)
+						os.Exit(1)
+						continue
+					}
+				} else if len(tempChars) >= 2 && tempChars[1] == 'd' {
+					if source[i] >= '0' && source[i] <= '9' {
+						tempChars += string(source[i])
+						i++
+						continue
+					} else {
+						fmt.Println("Lex error: Invalid decimal number literal: ", tempChars)
+						os.Exit(1)
+						continue
+					}
+				} else if source[i] >= '0' && source[i] <= '9' || source[i] == '.' {
+					tempChars += string(source[i])
+					i++
+					continue
+				} else {
+					fmt.Println("Lex error: Invalid number literal: ", tempChars)
+					os.Exit(1)
+					continue
+				}
+			case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				if source[i] >= '0' && source[i] <= '9' || source[i] == '.' || source[i] == 'e' {
+					tempChars += string(source[i])
+					i++
+					continue
+				} else {
+					fmt.Println("Lex error: Invalid number literal: ", tempChars)
+					os.Exit(1)
+					continue
+				}
+			default:
+				fmt.Println("Lex error: Invalid number literal: (default)", tempChars)
+				os.Exit(1)
 				continue
 			}
 		case LexStateInIdentifier:
@@ -974,7 +1074,7 @@ func LexSource(source string) []Token {
 				continue
 			}
 
-			tokens = append(tokens, Token{TokenTypeIdentifier, tempChars})
+			tokens.PushBack(Token{TokenTypeIdentifier, tempChars})
 			tempChars = ""
 			state = LexStateDefault
 			continue
@@ -1048,69 +1148,20 @@ const (
 	SyntaxTypeNamemap        = 80
 	SyntaxTypeExpression     = 90
 	SyntaxTypeStatement      = 100
+	SyntaxTypeLValue         = 110
+	SyntaxTypeRValue         = 120
+	SyntaxTypeType           = 130
+	SyntaxTypeIdentifer      = 140
+	SyntaxTypeNumberLiteral  = 150
+	SyntaxTypeStringLiteral  = 160
+	SyntaxTypeOperator       = 170
 )
 
-func ParseExpression(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
+///================================================================================================
+/// Util
+///================================================================================================
 
-	return node, nil
-}
-
-func ParseStatement(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseMeta(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseFunction(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseClass(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseStruct(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseUnion(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseEnum(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseNamespace(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func ParseTypedef(tokens []Token) (SyntaxNode, error) {
-	var node SyntaxNode
-
-	return node, nil
-}
-
-func findClosingBracket(tokens []Token, startIndex int) (int, error) {
+func findClosingBracket(tokens Tokens, startIndex int) (int, error) {
 	stack := make([]Token, 0)
 
 	opening := map[string]string{
@@ -1125,8 +1176,8 @@ func findClosingBracket(tokens []Token, startIndex int) (int, error) {
 		")": true,
 	}
 
-	for i := startIndex; i < len(tokens); i++ {
-		token := tokens[i]
+	for i := startIndex; i < tokens.Len(); i++ {
+		token := tokens.PeekAt(i)
 
 		if _, isOpen := opening[token.Value]; isOpen {
 			stack = append(stack, token)
@@ -1151,130 +1202,458 @@ func findClosingBracket(tokens []Token, startIndex int) (int, error) {
 	return -1, errors.New("closing bracket not found")
 }
 
-func ParserCheckIsNamespaceBlock(tokens []Token) (int, error) {
-	if len(tokens) < 4 {
-		return 0, nil
-	}
-
-	// the first token must be a namespace keyword
-	if tokens[0].Type != TokenTypeKeyword || tokens[0].Value != "namespace" {
-		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace keyword not found")
-	}
-
-	// the second token must be an identifier
-	if tokens[1].Type != TokenTypeIdentifier {
-		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace identifier not found")
-	}
-
-	// the third token must be a separator
-	if tokens[2].Type != TokenTypeSeparator || tokens[2].Value != "{" {
-		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block open separator not found")
-	}
-
-	offset, err := findClosingBracket(tokens, 2)
-	if err != nil {
-		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block close separator not found")
-	}
-
-	// the last token must be a separator
-	if tokens[offset].Type != TokenTypeSeparator || tokens[offset].Value != "}" {
-		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block close separator not found")
-	}
-
-	return offset, nil
+type Tokens struct {
+	tokens []Token
 }
 
-func ParserCheckIsFunction(tokens []Token) (int, error) {
-	return 0, nil
+func (t *Tokens) Clear() {
+	t.tokens = nil
 }
 
-func ParserCheckBlockType(tokens []Token) (int, int, error) {
-	if len(tokens) < 1 {
-		return 0, 0, fmt.Errorf("parsing error: failed to parse block. not enough tokens")
-	}
-
-	// check namespace block
-	offset, err := ParserCheckIsNamespaceBlock(tokens)
-	if err == nil && offset > 0 {
-		return SyntaxTypeNamespaceBlock, offset, nil
-	}
-
-	// check function
-	offset, err = ParserCheckIsFunction(tokens)
-	if err == nil && offset > 0 {
-		return SyntaxTypeFunction, offset, nil
-	}
-
-	return 0, 0, fmt.Errorf("parsing error: failed to parse block. unknown block type")
+func (t *Tokens) String() string {
+	return fmt.Sprintf("%v", t.tokens)
 }
 
-func ParseNamespaceBlock(tokens []Token, root *SyntaxNode) error {
-	stack := []struct {
-		tokens []Token
-		node   *SyntaxNode
-	}{{
-		tokens: tokens,
-		node:   root,
-	}}
+func (t *Tokens) Len() int {
+	return len(t.tokens)
+}
 
-	for len(stack) > 0 {
-		current := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
+func (t *Tokens) PeekFront() *Token {
+	return &(t.tokens)[0]
+}
 
-		if len(current.tokens) == 0 {
-			continue // Skip empty token sets
+func (t *Tokens) PeekBack() *Token {
+	return &(t.tokens)[len(t.tokens)-1]
+}
+
+func (t *Tokens) PeekAt(index int) Token {
+	return (t.tokens)[index]
+}
+
+func (t *Tokens) PeekRange(startIndex int, endIndex int) *Tokens {
+	if endIndex == -1 {
+		endIndex = t.Len()
+	}
+
+	return &Tokens{tokens: t.tokens[startIndex:endIndex]}
+}
+
+func (t *Tokens) PopAt(index int) Token {
+	token := (t.tokens)[index]
+	t.tokens = append((t.tokens)[:index], (t.tokens)[index+1:]...)
+	return token
+}
+
+func (t *Tokens) PopBack() Token {
+	var tok Token = (t.tokens)[len(t.tokens)-1]
+	t.tokens = t.tokens[:len(t.tokens)-1]
+	return tok
+}
+
+func (t *Tokens) PopFront() Token {
+	var tok Token = (t.tokens)[0]
+	t.tokens = t.tokens[1:]
+	return tok
+}
+
+func (t *Tokens) PopFrontN(n int) Tokens {
+	tokens := (t.tokens)[:n]
+	t.tokens = (t.tokens)[n:]
+	return Tokens{tokens}
+}
+
+func (t *Tokens) PopBackN(n int) Tokens {
+	tokens := (t.tokens)[len(t.tokens)-n:]
+	t.tokens = (t.tokens)[:len(t.tokens)-n]
+	return Tokens{tokens}
+}
+
+func (t *Tokens) PopRange(startIndex int, endIndex int) Tokens {
+	if endIndex == -1 {
+		endIndex = t.Len()
+	}
+
+	tokens := (t.tokens)[startIndex:endIndex]
+	t.tokens = append((t.tokens)[:startIndex], (t.tokens)[endIndex:]...)
+	return Tokens{tokens}
+
+}
+
+func (t *Tokens) PushFront(token Token) {
+	t.tokens = append([]Token{token}, t.tokens...)
+}
+
+func (t *Tokens) PushBack(token Token) {
+	t.tokens = append(t.tokens, token)
+}
+
+///================================================================================================
+/// Checking code types
+///================================================================================================
+
+func ParserCheckIsValidExpression(tokens Tokens) (bool, error) {
+	// check if literal number
+	if tokens.Len() < 1 {
+		return false, nil
+	}
+
+	fmt.Println("Checking expression: ", tokens.String())
+
+	if tokens.PeekFront().Type == TokenTypeLiteralNumber {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func ParserCheckIsValidStatement(tokens Tokens) (bool, error) {
+
+	// declare: identifier identifier;
+	// assign: identifier = expression;
+	// declare and assign: identifier identifier = expression;
+
+	// lets try it
+
+	if tokens.Len() < 3 {
+		return false, nil
+	}
+
+	// check if first token is an identifier or valid builtin type
+	if tokens.PeekFront().Type != TokenTypeIdentifier {
+		var found bool = false
+		for _, t := range LexBuiltinTypes {
+			if tokens.PeekFront().Value == t {
+				found = true
+				break
+			}
 		}
 
-		offset, err := ParserCheckIsNamespaceBlock(current.tokens)
-		if err != nil || offset == 0 {
+		if !found {
+			return false, nil
+		}
+	}
+
+	// check assignmenet
+	if tokens.PeekAt(1).Type == TokenTypeOperator && tokens.PeekAt(1).Value == "=" {
+		if x, err := ParserCheckIsValidExpression(*tokens.PeekRange(2, -1)); err == nil && x {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}
+
+	// declare and assign
+	if tokens.PeekAt(1).Type != TokenTypeIdentifier {
+		return false, nil
+	}
+
+	// verify that the identifier is not a keyword
+	var found bool = false
+	for _, keyword := range LexKeywords {
+		if tokens.PeekAt(1).Value == keyword {
+			found = true
+			break
+		}
+	}
+	if found {
+		return false, nil
+	}
+
+	if tokens.PeekAt(2).Type == TokenTypeOperator && tokens.PeekAt(2).Value == "=" {
+		if x, err := ParserCheckIsValidExpression(*tokens.PeekRange(3, -1)); err == nil && x {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}
+
+	if tokens.PeekAt(2).Type == TokenTypeSeparator && tokens.PeekAt(2).Value == ";" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func ParserCheckIsValidMeta(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidFunction(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidClass(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidStruct(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidUnion(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidEnum(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidNamespace(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidTypedef(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidForwardDeclare(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+func ParserCheckIsValidBlock(tokens Tokens) (bool, error) {
+	return false, nil
+}
+
+///================================================================================================
+/// Parsing
+///================================================================================================
+
+func ParseExpression(tokens *Tokens, node *SyntaxNode) error {
+	var expression SyntaxNode
+	var literal SyntaxNode
+
+	literal.Type = SyntaxTypeNumberLiteral
+	literal.Value = tokens.PeekFront().Value
+
+	expression.Type = SyntaxTypeExpression
+	expression.Value = "expression"
+
+	expression.AddChildNode(literal)
+
+	node.AddChildNode(expression)
+
+	// consume tokens
+	tokens.PopFront()
+
+	if tokens.PeekFront().Type == TokenTypeSeparator && tokens.PeekFront().Value == ";" {
+		tokens.PopFront()
+	}
+
+	fmt.Println("Tokens after expression: ", tokens.String())
+
+	return nil
+}
+
+func ParseStatement(tokens *Tokens, node *SyntaxNode) error {
+	var statement SyntaxNode
+	var newtype SyntaxNode
+	var identifier SyntaxNode
+
+	statement.Type = SyntaxTypeStatement
+	statement.Value = "assignment"
+
+	fmt.Println("Tokens before statement: ", tokens.String())
+
+	if tokens.Len() > 3 && tokens.PeekAt(1).Type == TokenTypeOperator && tokens.PeekAt(1).Value == "=" {
+		// assignment
+		// identifier = expression;
+		identifier.Type = SyntaxTypeLValue
+		identifier.Value = tokens.PeekFront().Value
+
+		statement.AddChildNode(identifier)
+
+		err := ParseExpression(tokens.PeekRange(2, -1), &statement)
+		if err != nil {
 			return err
 		}
 
-		newNode := current.node.AddChild(SyntaxTypeNamespaceBlock, current.tokens[1].Value, nil)
+		node.AddChildNode(statement)
+		return nil
+	} else if tokens.Len() > 3 && tokens.PeekAt(2).Type == TokenTypeOperator && tokens.PeekAt(2).Value == "=" {
+		// declare and assignment
+		// type identifier = expression;
+		newtype.Type = SyntaxTypeType
+		newtype.Value = tokens.PeekFront().Value
 
-		// Push the next set of tokens after the current namespace block
-		stack = append(stack, struct {
-			tokens []Token
-			node   *SyntaxNode
-		}{
-			tokens: current.tokens[offset+1:],
-			node:   current.node,
-		})
+		identifier.Type = SyntaxTypeIdentifer
+		identifier.Value = tokens.PeekAt(1).Value
 
-		// Push the tokens within the namespace block
-		stack = append(stack, struct {
-			tokens []Token
-			node   *SyntaxNode
-		}{
-			tokens: current.tokens[3:offset],
-			node:   newNode,
-		})
+		statement.AddChildNode(newtype)
+		statement.AddChildNode(identifier)
+
+		err := ParseExpression(tokens.PeekRange(3, -1), &statement)
+		if err != nil {
+			return err
+		}
+		node.AddChildNode(statement)
+
+		// consume tokens
+		tokens.PopFrontN(3)
+
+		fmt.Println("Tokens after expression(statement): ", tokens.String())
+
+		return nil
+	} else if tokens.Len() > 2 && tokens.PeekFront().Type == TokenTypeIdentifier && tokens.PeekAt(1).Type == TokenTypeIdentifier && tokens.PeekAt(2).Type == TokenTypeSeparator && tokens.PeekAt(2).Value == ";" {
+		// declare
+		// type identifier;
+		newtype.Type = SyntaxTypeType
+		newtype.Value = tokens.PeekFront().Value
+
+		identifier.Type = SyntaxTypeIdentifer
+		identifier.Value = tokens.PeekAt(1).Value
+
+		statement.AddChildNode(newtype)
+		statement.AddChildNode(identifier)
+		node.AddChildNode(statement)
+
+		return nil
+	}
+
+	return fmt.Errorf("parsing error: failed to parse statement")
+}
+
+func ParseMeta(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseFunction(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseClass(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseStruct(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseUnion(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseEnum(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseNamespace(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseTypedef(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseForwardDeclare(tokens *Tokens, node *SyntaxNode) error {
+
+	return nil
+}
+
+func ParseBlock(tokens *Tokens, node *SyntaxNode) error {
+	if tokens.Len() < 1 {
+		return fmt.Errorf("parsing error: failed to parse block. no tokens")
+	}
+
+	for tokens.Len() > 0 {
+		if x, err := ParserCheckIsValidExpression(*tokens); err == nil && x {
+			fmt.Println("Parsing expression")
+			if ParseExpression(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse expression")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidStatement(*tokens); err == nil && x {
+			if ParseStatement(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse statement")
+			}
+			fmt.Println("Tokens after statement: ", tokens.String())
+			continue
+		}
+
+		if x, err := ParserCheckIsValidMeta(*tokens); err == nil && x {
+			if ParseMeta(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse meta")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidFunction(*tokens); err == nil && x {
+			if ParseFunction(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse function")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidClass(*tokens); err == nil && x {
+			if ParseClass(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse class")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidStruct(*tokens); err == nil && x {
+			if ParseStruct(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse struct")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidUnion(*tokens); err == nil && x {
+			if ParseUnion(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse union")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidEnum(*tokens); err == nil && x {
+			if ParseEnum(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse enum")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidNamespace(*tokens); err == nil && x {
+			if ParseNamespace(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse namespace")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidTypedef(*tokens); err == nil && x {
+			if ParseTypedef(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse typedef")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidForwardDeclare(*tokens); err == nil && x {
+			if ParseForwardDeclare(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse forward declare")
+			}
+			continue
+		}
+
+		if x, err := ParserCheckIsValidBlock(*tokens); err == nil && x {
+			if ParseBlock(tokens, node) != nil {
+				return fmt.Errorf("parsing error: failed to parse block")
+			}
+			continue
+		}
 	}
 
 	return nil
 }
 
-func traversePreOrderIterative(root *SyntaxNode) {
-	if root == nil {
-		return
-	}
-
-	var randomVar = ""
-
-	stack := []*SyntaxNode{root}
-	for len(stack) > 0 {
-		current := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-
-		current.Value += randomVar
-
-		// Push children onto the stack in reverse order to maintain the desired order
-		for i := len(current.Children) - 1; i >= 0; i-- {
-			stack = append(stack, &current.Children[i])
-		}
-	}
-}
-func BuildSyntaxTree(tokens []Token) (SyntaxTree, error) {
+func BuildSyntaxTree(tokens *Tokens) (SyntaxTree, error) {
 	var tree SyntaxTree
 
 	tree.Root.Type = 0
@@ -1283,17 +1662,15 @@ func BuildSyntaxTree(tokens []Token) (SyntaxTree, error) {
 	// the code already is wrapped in the JXX:: namespace
 	// lets start parsing that block
 
-	err := ParseNamespaceBlock(tokens, &tree.Root)
+	fmt.Println("tokens before: ", tokens.String())
+
+	err := ParseBlock(tokens, &tree.Root)
 
 	if err != nil {
 		return tree, err
 	}
 
-	// iterate through the tree and append _1
-	// to the end of each node name
-	// this is for debugging purposes
-
-	traversePreOrderIterative(&tree.Root)
+	fmt.Println("tokens after: ", tokens.String())
 
 	return tree, nil
 }
@@ -1310,13 +1687,30 @@ func OptimizeSyntaxTree(tree SyntaxTree, level int) (SyntaxTree, error) {
 }
 
 type SourceCode struct {
-	Item []string
+	Items []string
 }
 
 func GenerateCXXCodeForNode(node SyntaxNode, src *SourceCode) error {
 	switch node.Type {
 	case SyntaxTypeNamespaceBlock:
-		src.Item = append(src.Item, fmt.Sprintf("namespace %s {\n", node.Value))
+		src.Items = append(src.Items, fmt.Sprintf("namespace %s {\n", node.Value))
+	case SyntaxTypeStatement:
+		{
+			var code string
+
+			for _, child := range node.Children {
+				switch child.Type {
+				case SyntaxTypeType:
+					code += child.Value + " "
+				case SyntaxTypeIdentifer:
+					code += child.Value
+				case SyntaxTypeExpression:
+					code += fmt.Sprintf(" = %s", child.Children[0].Value)
+				}
+			}
+
+			src.Items = append(src.Items, fmt.Sprintf("%s;\n", code))
+		}
 	default:
 		return nil
 	}
@@ -1340,6 +1734,7 @@ func GenerateCXXMetaAttributes(attrib []Attribute) (string, error) {
 
 func GenerateCXXCode(unit CompilerUnit) (string, error) {
 	var code string
+	var sourceCode SourceCode
 
 	code = "namespace jxx::globals\n{\n"
 
@@ -1351,6 +1746,27 @@ func GenerateCXXCode(unit CompilerUnit) (string, error) {
 	code += newCode
 
 	code += "}\n\nusing namespace jxx::globals;\n"
+
+	// In order to generate hiararchical code, we need to traverse the syntax tree
+	// in a depth first manner
+
+	var stack []SyntaxNode = []SyntaxNode{unit.Tree.Root}
+
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		err := GenerateCXXCodeForNode(current, &sourceCode)
+		if err != nil {
+			return "", err
+		}
+
+		for i := len(current.Children) - 1; i >= 0; i-- {
+			stack = append(stack, current.Children[i])
+		}
+	}
+
+	code += strings.Join(sourceCode.Items, "")
 
 	return code, nil
 }
@@ -1373,3 +1789,86 @@ func ConvertASTToYAML(tree []CompilerUnit) ([]byte, error) {
 
 	return yaml, nil
 }
+
+///================================================================================================
+/// old
+///================================================================================================
+
+// func ParseNamespaceBlock(tokens []Token, root *SyntaxNode) error {
+// 	stack := []struct {
+// 		tokens []Token
+// 		node   *SyntaxNode
+// 	}{{
+// 		tokens: tokens,
+// 		node:   root,
+// 	}}
+
+// 	for len(stack) > 0 {
+// 		current := stack[len(stack)-1]
+// 		stack = stack[:len(stack)-1]
+
+// 		if len(current.tokens) == 0 {
+// 			continue // Skip empty token sets
+// 		}
+
+// 		offset, err := ParserCheckIsNamespaceBlock(current.tokens)
+// 		if err != nil || offset == 0 {
+// 			return err
+// 		}
+
+// 		newNode := current.node.AddChild(SyntaxTypeNamespaceBlock, current.tokens.PeekAt(1).Value, nil)
+
+// 		// Push the next set of tokens after the current namespace block
+// 		stack = append(stack, struct {
+// 			tokens []Token
+// 			node   *SyntaxNode
+// 		}{
+// 			tokens: current.tokens[offset+1:],
+// 			node:   current.node,
+// 		})
+
+// 		// Push the tokens within the namespace block
+// 		stack = append(stack, struct {
+// 			tokens []Token
+// 			node   *SyntaxNode
+// 		}{
+// 			tokens: current.tokens[3:offset],
+// 			node:   newNode,
+// 		})
+// 	}
+
+// 	return nil
+// }
+
+// func ParserCheckIsNamespaceBlock(tokens []Token) (int, error) {
+// 	if tokens.Len() < 4 {
+// 		return 0, nil
+// 	}
+
+// 	// the first token must be a namespace keyword
+// 	if tokens[0].Type != TokenTypeKeyword || tokens[0].Value != "namespace" {
+// 		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace keyword not found")
+// 	}
+
+// 	// the second token must be an identifier
+// 	if tokens.PeekAt(1).Type != TokenTypeIdentifier {
+// 		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace identifier not found")
+// 	}
+
+// 	// the third token must be a separator
+// 	if tokens.PeekAt(2).Type != TokenTypeSeparator || tokens.PeekAt(2).Value != "{" {
+// 		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block open separator not found")
+// 	}
+
+// 	offset, err := findClosingBracket(tokens, 2)
+// 	if err != nil {
+// 		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block close separator not found")
+// 	}
+
+// 	// the last token must be a separator
+// 	if tokens[offset].Type != TokenTypeSeparator || tokens[offset].Value != "}" {
+// 		return 0, fmt.Errorf("parsing error: failed to parse namespace block. namespace block close separator not found")
+// 	}
+
+// 	return offset, nil
+// }

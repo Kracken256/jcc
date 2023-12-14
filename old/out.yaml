@@ -1,0 +1,33 @@
+designs/lang/test/expression.j:
+  type: 0
+  value: root
+  attributes: []
+  children:
+  - type: 100
+    value: assignment
+    attributes: []
+    children:
+    - type: 130
+      value: float
+      attributes: []
+      children: []
+    - type: 140
+      value: id
+      attributes: []
+      children: []
+    - type: 90
+      value: expression
+      attributes: []
+      children:
+      - type: 150
+        value: "0x1000"
+        attributes: []
+        children: []
+  - type: 90
+    value: expression
+    attributes: []
+    children:
+    - type: 150
+      value: "0x1000"
+      attributes: []
+      children: []

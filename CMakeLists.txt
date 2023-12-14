@@ -1,4 +1,4 @@
 cmake_minimum_required(VERSION 3.22)
-project(chip-lang)
+project(jxx-lang)
 
-add_subdirectory(transpiler/src)
+add_subdirectory(src)
