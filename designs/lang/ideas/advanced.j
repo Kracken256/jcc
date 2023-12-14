@@ -38,7 +38,7 @@ metafunction fn_swap(fn_swap_a, fn_swap_b)
 
     // use the non-zero operator to pick a random implementation
     // and bind it to the name fn_swap
-    random.get(0, 1) ? ? () fn_swap_a : () fn_swap_b;
+    @random.get(0, 1) ? ? () fn_swap_a : () fn_swap_b;
 }
 
 namespace app
@@ -51,7 +51,7 @@ namespace app
         @console.log("The PROJECT_NAME is: {{PROJECT_NAME}}");
 
         // Metamorphosis is a feature that allows you to write god-hacker-tier self-modifying code.
-        @runtime::engine::run<"console.log('Hello, world!');">();
+        @runtime::engine::run<"@console.log('Hello, world!');">();
 
         // catch exceptions
         try
@@ -69,7 +69,7 @@ namespace app
                 @console.log("Runtime memory exception: {{e.Message}}");
                 break;
             default:
-                raise fault("Exception not handled")
+                panic("Unknown exception type: {{e.Type}}", e);
             }
         }
         return;
