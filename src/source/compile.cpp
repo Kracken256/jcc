@@ -452,25 +452,34 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
         return false;
     }
 
-    std::size_t size = file.tellg();
+    std::streampos sizepos = file.tellg();
 
     if (file.fail())
     {
         this->push_message(CompilerMessageType::Error, "Unable to get size of file '" + filepath + "'");
+        file.close();
         return false;
     }
 
-    if (size == 0)
+    if (sizepos == 0)
     {
         this->push_message(CompilerMessageType::Warning, "File '" + filepath + "' is empty");
+        file.close();
+        return false;
+    }
+
+    if (sizepos == INT64_MAX)
+    {
+        this->push_message(CompilerMessageType::Error, "Unable to get size of file '" + filepath + "'");
+        file.close();
         return false;
     }
 
     file.seekg(0, std::ios::beg);
 
-    source_code.resize(size);
+    source_code.reserve(sizepos);
 
-    if (!file.read(source_code.data(), size))
+    if (!file.read(source_code.data(), sizepos))
     {
         this->push_message(CompilerMessageType::Error, "Unable to read file '" + filepath + "'");
         file.close();
@@ -496,6 +505,8 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     std::string source_code;
     TokenList tokens;
 
+    (void)file;
+
     if (!read_source_code(file, source_code))
     {
         this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
@@ -511,6 +522,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Error, "Lexer::lex(" + std::string(e.what()) + ")");
     }
 
+    /// TODO: remove after debugging
     std::cout << tokens.to_string() << std::endl;
 
     return false;
@@ -669,7 +681,7 @@ bool jcc::CompilationJob::run_job_internal()
 
         std::vector<std::thread> threads;
 
-        for (auto &unit : m_units)
+        for (auto unit : m_units)
         {
             threads.emplace_back([unit]()
                                  { unit.second->build(); });

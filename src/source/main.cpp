@@ -119,6 +119,19 @@ bool parse_arguments(StringVector args, JccMode &mode)
                 print_error("file '" + *it + "' does not exist");
                 return false;
             }
+
+            if (std::filesystem::is_directory(*it))
+            {
+                print_error("file '" + *it + "' is a directory. can not compile directories");
+                return false;
+            }
+
+            if (!std::filesystem::is_regular_file(*it))
+            {
+                print_error("file '" + *it + "' is not a regular file");
+                return false;
+            }
+
             mode.input_files.push_back(*it);
         }
     }
