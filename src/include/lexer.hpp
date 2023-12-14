@@ -18,7 +18,8 @@ namespace jcc
         StringLiteral,
         Operator,
         Punctuator,
-        Comment,
+        MultiLineComment,
+        SingleLineComment,
         Whitespace,
     };
 
