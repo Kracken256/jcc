@@ -43,11 +43,17 @@ struct JccMode
     std::vector<JccModeFlags> flags;
 };
 
+static void print_error(const std::string &message)
+{
+    std::cerr << "\x1b[37;49;1mjcc:\x1b[0m \x1b[31;49;1merror:\x1b[0m " << message << std::endl;
+}
+
 bool parse_arguments(StringVector args, JccMode &mode)
 {
     if (args.size() < 1)
     {
-        std::cerr << "jcc: argument error: no arguments specified" << std::endl;
+        // std::cerr << "jcc: argument error: no arguments specified" << std::endl;
+        print_error("no arguments specified");
         return false;
     }
 
@@ -55,18 +61,17 @@ bool parse_arguments(StringVector args, JccMode &mode)
 
     for (auto it = args.begin(); it != args.end(); ++it)
     {
-        if (*it == "-o")
+        if (*it == "-o" && mode.output_file != "")
+        {
+            print_error("multiple output files specified");
+            return false;
+        }
+        else if (*it == "-o")
         {
             if (it + 1 == args.end())
             {
-                std::cerr << "jcc: error: no output file specified" << std::endl;
+                print_error("no output file specified");
                 return true;
-            }
-
-            if (mode.output_file != "")
-            {
-                std::cerr << "jcc: error: multiple output files specified" << std::endl;
-                return false;
             }
 
             mode.output_file = *(++it);
@@ -111,7 +116,7 @@ bool parse_arguments(StringVector args, JccMode &mode)
         {
             if (!std::filesystem::exists(*it))
             {
-                std::cerr << "jcc: error: file '" << *it << "' does not exist" << std::endl;
+                print_error("file '" + *it + "' does not exist");
                 return false;
             }
             mode.input_files.push_back(*it);
@@ -120,7 +125,7 @@ bool parse_arguments(StringVector args, JccMode &mode)
 
     if (mode.input_files.size() == 0)
     {
-        std::cerr << "jcc: error: no input files specified" << std::endl;
+        print_error("no input files specified");
         return false;
     }
 
@@ -151,7 +156,7 @@ bool parse_arguments(StringVector args, JccMode &mode)
     const auto duplicate = std::adjacent_find(mode.flags.begin(), mode.flags.end());
     if (duplicate != mode.flags.end())
     {
-        std::cerr << "jcc: error: duplicate flag '" << flag_names[*duplicate] << "'" << std::endl;
+        print_error("duplicate flag '" + flag_names[*duplicate] + "'");
         return false;
     }
 
@@ -160,7 +165,7 @@ bool parse_arguments(StringVector args, JccMode &mode)
     const auto duplicate_file = std::adjacent_find(input_files_copy.begin(), input_files_copy.end());
     if (duplicate_file != input_files_copy.end())
     {
-        std::cerr << "jcc: error: duplicate input file '" << *duplicate_file << "'" << std::endl;
+        print_error("duplicate input file '" + *duplicate_file + "'");
         return false;
     }
 
@@ -196,7 +201,7 @@ int main(int argc, char **argv)
 
     if (!job.success())
     {
-        std::cerr << "jcc: error: compilation failed" << std::endl;
+        print_error("compilation failed");
         return 1;
     }
 

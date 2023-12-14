@@ -150,5 +150,7 @@ size_t jcc::TokenList::size() const
 
 std::vector<jcc::Token> jcc::Lexer::lex(const std::string &source)
 {
+    /// TODO: implement
+    (void)source;
     return {};
 }

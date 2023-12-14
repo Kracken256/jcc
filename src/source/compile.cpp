@@ -465,11 +465,6 @@ uint8_t jcc::CompilationJob::progress() const
     return m_progress;
 }
 
-static void build_unit(std::shared_ptr<jcc::CompilationUnit> unit)
-{
-    unit->build();
-}
-
 bool jcc::CompilationJob::run_job_internal()
 {
     if (m_units.empty())
@@ -484,11 +479,11 @@ bool jcc::CompilationJob::run_job_internal()
 
         std::vector<std::thread> threads;
 
-        for (const auto &unit : m_units)
+        for (auto &unit : m_units)
         {
-            std::thread thread = std::thread(build_unit, unit.second);
-            threads.push_back(std::move(thread));
-            thread.detach();
+            threads.emplace_back([unit]() {
+                unit.second->build();
+            });
         }
 
         for (auto &thread : threads)
