@@ -31,7 +31,7 @@ std::string jcc::Token::to_string() const
     switch (this->m_type)
     {
     case TokenType::Identifier:
-        return std::string("Identifier(" + m_value + ")");
+        return std::string("Identifier(\"" + m_value + "\")");
         break;
     case TokenType::Keyword:
         return std::string("Keyword(" + m_value + ")");
@@ -40,13 +40,13 @@ std::string jcc::Token::to_string() const
         return std::string("NumberLiteral(" + m_value + ")");
         break;
     case TokenType::StringLiteral:
-        return std::string("StringLiteral(" + m_value + ")");
+        return std::string("StringLiteral(\"" + m_value + "\")");
         break;
     case TokenType::Operator:
-        return std::string("Operator(" + m_value + ")");
+        return std::string("Operator('" + m_value + "')");
         break;
     case TokenType::Punctuator:
-        return std::string("Punctuator(" + m_value + ")");
+        return std::string("Punctuator('" + m_value + "')");
         break;
     case TokenType::Comment:
         return std::string("Comment(" + m_value + ")");
@@ -113,15 +113,19 @@ const std::vector<jcc::Token> &jcc::TokenList::tokens() const
 
 std::string jcc::TokenList::to_string() const
 {
-
     std::string result = "TokenList(";
-    for (auto &token : m_tokens)
+
+    for (size_t i = 0; i < m_tokens.size(); i++)
     {
-        result += token.to_string() + ", ";
+        result += m_tokens[i].to_string();
+
+        if (i != m_tokens.size() - 1)
+        {
+            result += ", ";
+        }
     }
-    result = result.substr(0, result.length() - 2);
-    result += ")";
-    return result;
+
+    return result + ")";
 }
 
 const jcc::Token &jcc::TokenList::operator[](size_t index) const
@@ -148,9 +152,20 @@ size_t jcc::TokenList::size() const
 /// jcc::Lexer class implementation
 ///=============================================================================
 
-std::vector<jcc::Token> jcc::Lexer::lex(const std::string &source)
+jcc::TokenList jcc::Lexer::lex(const std::string &source)
 {
     /// TODO: implement
     (void)source;
-    return {};
+
+    TokenList result;
+
+    result.push_back(Token(TokenType::Keyword, "int"));
+    result.push_back(Token(TokenType::Identifier, "main"));
+    result.push_back(Token(TokenType::Punctuator, "("));
+    result.push_back(Token(TokenType::Punctuator, ")"));
+    result.push_back(Token(TokenType::Punctuator, "{"));
+    result.push_back(Token(TokenType::Punctuator, "}"));
+    
+
+    return result;
 }

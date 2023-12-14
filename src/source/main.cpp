@@ -45,7 +45,7 @@ struct JccMode
 
 static void print_error(const std::string &message)
 {
-    std::cerr << "\x1b[37;49;1mjcc:\x1b[0m \x1b[31;49;1merror:\x1b[0m " << message << std::endl;
+    std::cerr << "\x1b[37;49;1mjcc:\x1b[0m \x1b[31;49;1mError:\x1b[0m " << message << std::endl;
 }
 
 bool parse_arguments(StringVector args, JccMode &mode)

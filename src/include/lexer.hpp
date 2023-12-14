@@ -61,8 +61,6 @@ namespace jcc
         TokenList(const std::vector<Token> &tokens);
 
         ~TokenList() = default;
-        TokenList(const TokenList &) = delete;
-        TokenList &operator=(const TokenList &) = delete;
 
         /// @brief Push a token to the back of the list
         /// @param token The token to push
@@ -115,7 +113,7 @@ namespace jcc
 
         const char *what() const noexcept override
         {
-            return std::string("LexerException: " + m_message).c_str();
+            return m_message.c_str();
         }
 
     protected:
@@ -192,7 +190,7 @@ namespace jcc
         /// @param source JXX source code raw string
         /// @return A vector of tokens
         /// @throw LexerException
-        static std::vector<Token> lex(const std::string &source);
+        static TokenList lex(const std::string &source);
 
     private:
         Lexer() = default;

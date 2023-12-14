@@ -1,4 +1,5 @@
 #include "compile.hpp"
+#include "lexer.hpp"
 #include <stdexcept>
 #include <openssl/evp.h>
 #include <gmpxx.h>
@@ -6,6 +7,7 @@
 #include <filesystem>
 #include <thread>
 #include <iostream>
+#include <fstream>
 
 ///=============================================================================
 /// jcc::CompilerMessage class implementation
@@ -74,42 +76,84 @@ std::string jcc::CompilerMessage::longhash() const
 
 std::string jcc::CompilerMessage::message() const
 {
+    std::string part1, part2, part3, part4;
+
+    if (!this->m_file.empty())
+    {
+        part1 = this->m_file + ":";
+    }
+
+    if (this->m_line != 0 && m_line != 0)
+    {
+        part2 = std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": ";
+    }
+    else
+    {
+        part1 += " ";
+    }
+
     switch (this->m_type)
     {
     case CompilerMessageType::Common:
-        return std::string(this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": Generic: " + this->m_message);
+        part3 = "Generic: ";
+        break;
     case CompilerMessageType::Error:
-        return std::string(this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": Error: " + this->m_message);
+        part3 = "Error: ";
+        break;
     case CompilerMessageType::Warning:
-        return std::string(this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": Warning: " + this->m_message);
+        part3 = "Warning: ";
         break;
     case CompilerMessageType::Info:
-        return std::string(this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": Info: " + this->m_message);
+        part3 = "Info: ";
+        break;
     default:
         throw std::runtime_error("CompilerMessage::message(): Unknown message type");
     }
 
-    return "";
+    part4 = this->m_message;
+
+    return part1 + part2 + part3 + part4;
 }
 
 std::string jcc::CompilerMessage::ansi_message() const
 {
+    std::string part1, part2, part3, part4;
+
+    if (!this->m_file.empty())
+    {
+        part1 = "\x1b[37;49;1m" + this->m_file + ":";
+    }
+
+    if (this->m_line != 0 && m_line != 0)
+    {
+        part2 = std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ":\x1b[0m ";
+    }
+    else
+    {
+        part1 += "\x1b[0m ";
+    }
+
     switch (this->m_type)
     {
     case CompilerMessageType::Common:
-        return std::string("\x1b[37;49;1m" + this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ":\x1b[0m Generic:\x1b[0m " + this->m_message);
+        part3 = "Generic:\x1b[0m ";
+        break;
     case CompilerMessageType::Error:
-        return std::string("\x1b[37;49;1m" + this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": \x1b[31;49;1mError:\x1b[0m " + this->m_message);
+        part3 = "\x1b[31;49;1mError:\x1b[0m ";
+        break;
     case CompilerMessageType::Warning:
-        return std::string("\x1b[37;49;1m" + this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": \x1b[35;49;1mWarning:\x1b[0m " + this->m_message);
+        part3 = "\x1b[35;49;1mWarning:\x1b[0m ";
         break;
     case CompilerMessageType::Info:
-        return std::string("\x1b[37;49;1m" + this->m_file + ":" + std::to_string(this->m_line) + ":" + std::to_string(this->m_column) + ": \x1b[36;49;1mInfo:\x1b[0m " + this->m_message);
+        part3 = "\x1b[36;49;1mInfo:\x1b[0m ";
+        break;
     default:
         throw std::runtime_error("CompilerMessage::ansi_message(): Unknown message type");
     }
 
-    return "";
+    part4 = this->m_message;
+
+    return part1 + part2 + part3 + part4;
 }
 
 static std::string base58_encode(const std::string &input)
@@ -318,12 +362,159 @@ std::vector<jcc::CompilerInfo> jcc::CompilationUnit::infos() const
 
 bool jcc::CompilationUnit::build()
 {
-    /// TODO: implement
-    // this->m_success = true;
+    this->m_success = false;
 
-    this->push_message(CompilerMessageType::Error, "Compiler not implemented yet");
+    /// TODO: implement
+    this->push_message(CompilerMessageType::Warning, "Compiler not implemented yet");
+
+    for (const auto &file : this->m_files)
+    {
+        if (!compile_file(file))
+        {
+            return false;
+        }
+    }
+
+    this->m_success = true;
 
     return true;
+}
+
+// https://stackoverflow.com/questions/28270310/how-to-easily-detect-utf8-encoding-in-the-string
+static bool is_valid_utf8(const std::string &input)
+{
+    if (input.empty())
+        return true;
+
+    // const unsigned char * bytes = (const unsigned char *)string;
+    size_t i = 0;
+    unsigned int cp;
+    int num;
+
+    while (i < input.size())
+    {
+        unsigned char cb = input[i];
+
+        if ((cb & 0x80) == 0x00)
+        {
+            // U+0000 to U+007F
+            cp = (cb & 0x7F);
+            num = 1;
+        }
+        else if ((cb & 0xE0) == 0xC0)
+        {
+            // U+0080 to U+07FF
+            cp = (cb & 0x1F);
+            num = 2;
+        }
+        else if ((cb & 0xF0) == 0xE0)
+        {
+            // U+0800 to U+FFFF
+            cp = (cb & 0x0F);
+            num = 3;
+        }
+        else if ((cb & 0xF8) == 0xF0)
+        {
+            // U+10000 to U+10FFFF
+            cp = (cb & 0x07);
+            num = 4;
+        }
+        else
+            return false;
+
+        i += 1;
+        for (int i = 1; i < num; ++i)
+        {
+            if ((cb & 0xC0) != 0x80)
+                return false;
+            cp = (cp << 6) | (cb & 0x3F);
+            i += 1;
+        }
+
+        if ((cp > 0x10FFFF) ||
+            ((cp >= 0xD800) && (cp <= 0xDFFF)) ||
+            ((cp <= 0x007F) && (num != 1)) ||
+            ((cp >= 0x0080) && (cp <= 0x07FF) && (num != 2)) ||
+            ((cp >= 0x0800) && (cp <= 0xFFFF) && (num != 3)) ||
+            ((cp >= 0x10000) && (cp <= 0x1FFFFF) && (num != 4)))
+            return false;
+    }
+
+    return true;
+}
+
+bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::string &source_code)
+{
+    std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+
+    if (!file.is_open())
+    {
+        this->push_message(CompilerMessageType::Error, "Unable to open file '" + filepath + "' for reading");
+        return false;
+    }
+
+    std::size_t size = file.tellg();
+
+    if (file.fail())
+    {
+        this->push_message(CompilerMessageType::Error, "Unable to get size of file '" + filepath + "'");
+        return false;
+    }
+
+    if (size == 0)
+    {
+        this->push_message(CompilerMessageType::Warning, "File '" + filepath + "' is empty");
+        return false;
+    }
+
+    file.seekg(0, std::ios::beg);
+
+    source_code.resize(size);
+
+    if (!file.read(source_code.data(), size))
+    {
+        this->push_message(CompilerMessageType::Error, "Unable to read file '" + filepath + "'");
+        file.close();
+        return false;
+    }
+
+    file.close();
+
+    // prelininary check for UTF-8
+    if (!is_valid_utf8(source_code))
+    {
+        this->push_message(CompilerMessageType::Error, "File '" + filepath + "' is not a valid J++ source file (invalid UTF-8)");
+        return false;
+    }
+
+    return true;
+}
+
+bool jcc::CompilationUnit::compile_file(const std::string &file)
+{
+    /// TOOD: implement
+
+    std::string source_code;
+    TokenList tokens;
+
+    if (!read_source_code(file, source_code))
+    {
+        this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
+        return false;
+    }
+
+    try
+    {
+        tokens = Lexer::lex(source_code);
+    }
+    catch (const LexerException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Lexer::lex(" + std::string(e.what()) + ")");
+    }
+
+    std::cout << tokens.to_string() << std::endl;
+
+    return false;
 }
 
 bool jcc::CompilationUnit::success() const
@@ -481,9 +672,8 @@ bool jcc::CompilationJob::run_job_internal()
 
         for (auto &unit : m_units)
         {
-            threads.emplace_back([unit]() {
-                unit.second->build();
-            });
+            threads.emplace_back([unit]()
+                                 { unit.second->build(); });
         }
 
         for (auto &thread : threads)

@@ -166,7 +166,24 @@ namespace jcc
         std::vector<std::shared_ptr<CompilerMessage>> m_messages;
         bool m_success;
 
+        /// @brief Push a message to the compilation unit
+        /// @param type The type of the message
+        /// @param message The message
+        /// @param file The file that the message originated from
+        /// @param line Line number that the message originated from
+        /// @param column Column number that the message originated from
         void push_message(CompilerMessageType type, const std::string &message, const std::string &file = "", int line = 0, int column = 0);
+
+        /// @brief Compile a file
+        /// @param file The file to compile
+        /// @return True if successful, false otherwise
+        bool compile_file(const std::string &file);
+
+        /// @brief Read the source code from a file
+        /// @param filepath The path to the file
+        /// @param source_code The source code
+        /// @return True if successful, false otherwise
+        bool read_source_code(const std::string &filepath, std::string &source_code);
     };
 
     class CompilationJob
