@@ -15,6 +15,7 @@ namespace jcc
         Identifier,
         Keyword,
         NumberLiteral,
+        FloatingPointLiteral,
         StringLiteral,
         Operator,
         Punctuator,
@@ -22,6 +23,8 @@ namespace jcc
         SingleLineComment,
         Whitespace,
     };
+
+    typedef std::variant<std::string, uint64_t, double, const char *> TokenValueType;
 
     class Token
     {
@@ -33,7 +36,7 @@ namespace jcc
         /// @brief Construct a new Token object
         /// @param type The type of the token
         /// @param value The value of the token
-        Token(TokenType type, const std::string &value);
+        Token(TokenType type, TokenValueType value);
 
         /// @brief Get the type of the token
         /// @return TokenType
@@ -41,7 +44,7 @@ namespace jcc
 
         /// @brief Get the value of the token
         /// @return std::string
-        const std::string &value() const;
+        const TokenValueType &value() const;
 
         /// @brief Convert the token to a string
         /// @return std::string
@@ -49,7 +52,7 @@ namespace jcc
 
     private:
         TokenType m_type;
-        std::string m_value;
+        TokenValueType m_value;
     };
 
     class TokenList
@@ -87,6 +90,10 @@ namespace jcc
         /// @return std::string
         std::string to_string() const;
 
+        /// @brief Convert TokenList to an ANSI string
+        /// @return std::string
+        std::string to_json() const;
+
         /// @brief Get the token at the specified index
         /// @param index The index of the token
         /// @return Token
@@ -98,6 +105,10 @@ namespace jcc
         /// @brief Get the size of the list
         /// @return size_t
         size_t size() const;
+
+        /// @brief Get the tokens. Throws exception if the list is locked.
+        /// @return std::vector<Token>
+        std::vector<Token> &data();
 
     private:
         std::vector<Token> m_tokens;
@@ -191,7 +202,7 @@ namespace jcc
         /// @param source JXX source code raw string
         /// @return A vector of tokens
         /// @throw LexerException
-        static TokenList lex(const std::string &source);
+        static TokenList lex(const std::string &source, bool preprocess = true);
 
     private:
         Lexer() = default;

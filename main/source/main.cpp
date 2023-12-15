@@ -7,8 +7,7 @@
 #include <openssl/crypto.h>
 #include <mutex>
 #include <functional>
-#include "lexer.hpp"
-#include "compile.hpp"
+#include "jcc/compile.hpp"
 #include <algorithm>
 
 using namespace jcc;

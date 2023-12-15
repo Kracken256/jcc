@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(jcc-language-compiler)
+project(jcc)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -16,6 +16,8 @@ if (NOT GMP_LIB)
     message(FATAL_ERROR "libgmp not found")
 endif ()
 
+set(JCC_LIB ${CMAKE_BINARY_DIR}/libjcc/libjcc.a)
+
 message(STATUS "libcrypto found at ${CRYPTO_LIB}")
 message(STATUS "libgmp found at ${GMP_LIB}")
 
@@ -23,9 +25,10 @@ file(GLOB_RECURSE SOURCES "source/*.cpp")
 file(GLOB_RECURSE HEADERS "source/*.h" "source/*.hpp")
 
 add_executable(jcc ${SOURCES} ${HEADERS})
+add_dependencies(jcc libjcc)
 target_include_directories(jcc PRIVATE include)
-target_compile_options(jcc PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror)
-target_link_libraries(jcc PRIVATE -static-libgcc -static-libstdc++ ${CRYPTO_LIB} ${GMP_LIB} -static )
+target_compile_options(jcc PRIVATE -O3 -Wall -Wextra -Wpedantic )
+target_link_libraries(jcc PRIVATE -static-libgcc -static-libstdc++ ${JCC_LIB} ${CRYPTO_LIB} ${GMP_LIB} -static)
 
 if (BUILD_RELEASE MATCHES "on")
     add_custom_command(TARGET jcc POST_BUILD
@@ -35,5 +38,6 @@ if (BUILD_RELEASE MATCHES "on")
             COMMAND mv $<TARGET_FILE:jcc> ${CMAKE_SOURCE_DIR}/bin/jcc)
 else ()
     add_custom_command(TARGET jcc POST_BUILD
-            COMMAND mv $<TARGET_FILE:jcc> ${CMAKE_SOURCE_DIR}/jcc)
+            COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/bin
+            COMMAND mv $<TARGET_FILE:jcc> ${CMAKE_SOURCE_DIR}/bin/jcc)
 endif ()

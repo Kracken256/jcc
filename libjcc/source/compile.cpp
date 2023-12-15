@@ -562,7 +562,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     }
 
     /// TODO: remove after debugging
-    std::cout << tokens.to_string() << std::endl;
+    std::cout << tokens.to_json() << std::endl;
 
     /// TODO: Implement parser
 
