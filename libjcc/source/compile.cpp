@@ -1,16 +1,23 @@
 #include "compile.hpp"
 #include "lexer.hpp"
 #include <stdexcept>
-#include <openssl/evp.h>
-#include <gmpxx.h>
 #include <algorithm>
 #include <filesystem>
 #include <thread>
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <chrono>
+#include <atomic>
+#include <iomanip>
+#include <cstring>
 
 #if defined(__linux__)
 #include <execinfo.h>
+#include <openssl/evp.h>
+#include <gmpxx.h>
+#else
+#error "Cross-platform support is not implemented yet"
 #endif
 
 ///=============================================================================
@@ -160,6 +167,7 @@ std::string jcc::CompilerMessage::ansi_message() const
     return part1 + part2 + part3 + part4;
 }
 
+#if defined(__linux__)
 static std::string base58_encode(const std::string &input)
 {
     static const char *ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -191,12 +199,21 @@ static std::string base58_encode(const std::string &input)
     std::reverse(output.begin(), output.end());
     return output;
 }
+#else 
+
+static std::string base58_encode(const std::string &input)
+{
+    return "";
+}
+
+#endif 
 
 static uint32_t unix_timestamp()
 {
     return (uint32_t)((uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() & 0xFFFFFFFF);
 }
 
+#if defined(__linux__)
 static std::string compute_sha256(const std::string &message)
 {
     unsigned char hash[EVP_MAX_MD_SIZE];
@@ -241,6 +258,20 @@ static std::string compute_sha256(const std::string &message)
 
     return std::string((char *)hash, md_len);
 }
+#else 
+static std::string compute_sha256(const std::string &message)
+{
+    BYTE hash[SHA256_BLOCK_SIZE];
+    SHA256_CTX ctx;
+
+    sha256_init(&ctx);
+    sha256_update(&ctx, (const BYTE *)message.c_str(), message.size());
+    sha256_final(&ctx, hash);
+
+    return std::string((char *)hash, SHA256_BLOCK_SIZE);
+}
+
+#endif 
 
 void jcc::CompilerMessage::generate_hash()
 {
@@ -404,7 +435,7 @@ static bool is_valid_utf8(const std::string &input)
     if (input.empty())
         return true;
 
-    const unsigned char * bytes = (const unsigned char *)input.c_str();
+    const unsigned char *bytes = (const unsigned char *)input.c_str();
     unsigned int cp;
     int num;
 
@@ -412,25 +443,25 @@ static bool is_valid_utf8(const std::string &input)
     {
         if ((*bytes & 0x80) == 0x00)
         {
-            // U+0000 to U+007F 
+            // U+0000 to U+007F
             cp = (*bytes & 0x7F);
             num = 1;
         }
         else if ((*bytes & 0xE0) == 0xC0)
         {
-            // U+0080 to U+07FF 
+            // U+0080 to U+07FF
             cp = (*bytes & 0x1F);
             num = 2;
         }
         else if ((*bytes & 0xF0) == 0xE0)
         {
-            // U+0800 to U+FFFF 
+            // U+0800 to U+FFFF
             cp = (*bytes & 0x0F);
             num = 3;
         }
         else if ((*bytes & 0xF8) == 0xF0)
         {
-            // U+10000 to U+10FFFF 
+            // U+10000 to U+10FFFF
             cp = (*bytes & 0x07);
             num = 4;
         }
