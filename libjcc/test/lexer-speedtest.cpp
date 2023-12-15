@@ -78,7 +78,7 @@ int main()
 
     double avg = sum / times.size();
     std::cout << "Total tokens: " << list.size() << std::endl;
-    std::cout << "Overall: " << (uint64_t)avg << " ns" << std::endl;
+    std::cout << "Avg total: " << (uint64_t)avg << " ns" << std::endl;
     std::cout << "Avg compute time: " << avg / (raw.size() * 8) << " ns/bit" << std::endl;
 
     if (list.size() == 0)
