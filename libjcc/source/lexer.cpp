@@ -1,4 +1,5 @@
 #include "lexer.hpp"
+#include "compile.hpp"
 #include <iostream>
 #include <set>
 #include <string>
@@ -106,7 +107,7 @@ void jcc::TokenList::push_back(const jcc::Token &token)
 {
     if (this->m_locked)
     {
-        throw std::runtime_error("Unable to push_back to TokenList, it is locked");
+        panic("Unable to push_back to TokenList, it is locked", {});
     }
 
     m_tokens.push_back(token);
@@ -116,7 +117,7 @@ void jcc::TokenList::push_back(const std::vector<jcc::Token> &tokens)
 {
     if (this->m_locked)
     {
-        throw std::runtime_error("Unable to push_back vector to TokenList, it is locked");
+        panic("Unable to push_back vector to TokenList, it is locked", {});
     }
 
     m_tokens.insert(m_tokens.end(), tokens.begin(), tokens.end());
@@ -165,6 +166,10 @@ std::string jcc::TokenList::to_json() const
     {
         if (m_tokens[i].type() == TokenType::Whitespace || m_tokens[i].type() == TokenType::SingleLineComment || m_tokens[i].type() == TokenType::MultiLineComment)
         {
+            if (i == m_tokens.size() - 1)
+            {
+                return result.substr(0, result.length() - 1) + "]";
+            }
             continue;
         }
 
@@ -257,7 +262,7 @@ void jcc::TokenList::pop_front()
 {
     if (this->m_locked)
     {
-        throw std::runtime_error("Unable to pop_front from TokenList, it is locked");
+        panic("Unable to pop_front from TokenList, it is locked", {});
     }
 
     m_tokens.erase(m_tokens.begin());
@@ -272,7 +277,7 @@ std::vector<jcc::Token> &jcc::TokenList::data()
 {
     if (this->m_locked)
     {
-        throw std::runtime_error("Unable to get data from TokenList, it is locked");
+        panic("Unable to get data from TokenList, it is locked", {});
     }
 
     return m_tokens;
@@ -425,6 +430,7 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"delete", 6}, // dynamic deallocation
 };
 
+/// TODO: Formally define language defined keywords
 static std::set<const char *> lexKeywords = {
     "namemap",
     "namespace",
@@ -459,6 +465,7 @@ static std::set<const char *> lexKeywords = {
     "metatype",
     "metafunction",
     "meta",
+    "static",
     "sizeof",
     "if",
     "else",
@@ -495,6 +502,7 @@ enum class NumberLiteralType
 {
     Invalid,
     Decimal,
+    DecimalExplicit,
     Hexadecimal,
     Binary,
     Octal,
@@ -526,7 +534,7 @@ static NumberLiteralType check_number_literal_type(std::string input)
     {
         for (size_t i = 2; i < input.length(); i++)
         {
-            if (!((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || (input[i] >= 'A' && input[i] <= 'F')))
+            if (!((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f')))
             {
                 return NumberLiteralType::Invalid;
             }
@@ -564,7 +572,7 @@ static NumberLiteralType check_number_literal_type(std::string input)
                 return NumberLiteralType::Invalid;
             }
         }
-        return NumberLiteralType::Decimal;
+        return NumberLiteralType::DecimalExplicit;
     }
     else
     {
@@ -590,10 +598,9 @@ test_float:
     return NumberLiteralType::Invalid;
 }
 
-void normalize_number_literal(std::string &number, size_t column, size_t line)
+uint64_t normalize_number_literal(std::string &number, size_t column, size_t line)
 {
-    uint64_t value = 0;
-    std::stringstream ss;
+    uint64_t x = 0;
 
     for (size_t i = 0; i < number.length(); i++)
     {
@@ -609,44 +616,68 @@ void normalize_number_literal(std::string &number, size_t column, size_t line)
     switch (type)
     {
     case NumberLiteralType::Hexadecimal:
-        break;
-    case NumberLiteralType::Binary:
-        // convert binary string to uint64_t
         for (size_t i = 2; i < number.length(); ++i)
         {
             // check for overflow
-            if (value & 0x8000000000000000)
+            if (x & 0xF000000000000000)
+            {
+                throw jcc::LexerExceptionInvalidLiteral("Hexadecimal number literal at line " + std::to_string(line) + ", column " + std::to_string(column) + " is too large. Will not fit in 64 bits.");
+            }
+
+            if (number[i] >= '0' && number[i] <= '9')
+            {
+                x = (x << 4) + (number[i] - '0');
+            }
+            else if (number[i] >= 'a' && number[i] <= 'f')
+            {
+                x = (x << 4) + (number[i] - 'a' + 10);
+            }
+            else
+            {
+                throw jcc::LexerExceptionInvalidLiteral("Hexadecimal number literal not valid at line " + std::to_string(line) + ", column " + std::to_string(column));
+            }
+        }
+        break;
+    case NumberLiteralType::Binary:
+        for (size_t i = 2; i < number.length(); ++i)
+        {
+            // check for overflow
+            if (x & 0x8000000000000000)
             {
                 throw jcc::LexerExceptionInvalidLiteral("Binary number literal at line " + std::to_string(line) + ", column " + std::to_string(column) + " is too large. Will not fit in 64 bits.");
             }
 
-            value = (value << 1) + (number[i] - '0');
+            x = (x << 1) + (number[i] - '0');
         }
-
-        ss << "0x" << std::hex << value;
-        number = ss.str();
         break;
     case NumberLiteralType::Octal:
         for (size_t i = 2; i < number.length(); ++i)
         {
             // check for overflow
-            if (value & 0xE000000000000000)
+            if (x & 0xE000000000000000)
             {
                 throw jcc::LexerExceptionInvalidLiteral("Octal number literal at line " + std::to_string(line) + ", column " + std::to_string(column) + " is too large. Will not fit in 64 bits.");
             }
 
-            value = (value << 3) + (number[i] - '0');
+            x = (x << 3) + (number[i] - '0');
         }
-        ss << "0x" << std::hex << value;
-        number = ss.str();
+        break;
+    case NumberLiteralType::DecimalExplicit:
+        x = std::stoull(number.substr(2));
         break;
     case NumberLiteralType::Decimal:
+        x = std::stoull(number);
         break;
     case NumberLiteralType::Floating:
+        /// TODO: Implement floating point number literal normalization
+        throw jcc::LexerExceptionInvalidLiteral("Floating point number literal not valid at line " + std::to_string(line) + ", column " + std::to_string(column) + ". Floating point literals are not supported yet.");
         break;
     default:
         break;
     }
+
+    /// TODO: Verify correctness of literal normalization
+    return x;
 }
 
 /// @brief Lex the source code into a list of tokens
@@ -656,7 +687,7 @@ void normalize_number_literal(std::string &number, size_t column, size_t line)
 /// @note This is probably the most complex I have ever written. So expect bugs.
 jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
 {
-    /// TODO: implement
+    /// TODO: Run unit tests on this function
     std::string preprocessed = source, current_token;
     TokenList result;
     LexerState state = LexerState::Default;
@@ -843,7 +874,6 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
             }
 
             // Check for number literal
-            /// TODO: Check for number literal
             if (std::isdigit(current_char))
             {
                 state = LexerState::NumberLiteral;
@@ -1093,9 +1123,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
             break;
 
         finish_number_literal:
-            normalize_number_literal(current_token, column, line);
-            /// TODO: Fix this
-            result.push_back(Token(TokenType::NumberLiteral, (uint64_t)0));
+            result.push_back(Token(TokenType::NumberLiteral, normalize_number_literal(current_token, column, line)));
             current_token.clear();
             state = LexerState::Default;
             continue;
