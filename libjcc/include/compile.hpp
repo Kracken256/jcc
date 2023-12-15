@@ -158,11 +158,17 @@ namespace jcc
         /// @return True if successful, false otherwise
         bool success() const;
 
+        /// @brief Reset instance and clear all build-specific ephemeral data (keep user parameters)
+        void reset_instance();
+
     private:
         std::vector<std::string> m_files;
         size_t m_current_file;
         std::set<CompileFlag> m_flags;
         std::string m_output_file;
+        /// @brief Map input to c++ temporary output files
+        std::map<std::string, std::string> m_cxx_temp_files;
+        std::map<std::string, std::string> m_obj_temp_files;
         std::vector<std::shared_ptr<CompilerMessage>> m_messages;
         bool m_success;
 
@@ -184,6 +190,22 @@ namespace jcc
         /// @param source_code The source code
         /// @return True if successful, false otherwise
         bool read_source_code(const std::string &filepath, std::string &source_code);
+
+        /// @brief Invoke the JCC helper c++ compiler
+        /// @param input_cxx Input c++ file
+        /// @param output_obj Output object file
+        /// @param flags Flags to pass to the compiler
+        /// @return True if successful, false otherwise
+        /// @note This function will populate the messages vector
+        bool invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags);
+
+        /// @brief Invoke the JCC helper linker
+        /// @param input_objs Input object files
+        /// @param outputname Output executable name
+        /// @param flags Flags to pass to the linker
+        /// @return True if successful, false otherwise
+        /// @note This function will populate the messages vector
+        bool invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags);
     };
 
     class CompilationJob
@@ -195,7 +217,7 @@ namespace jcc
         /// @brief Add a compilation unit to the job
         /// @param unit_name A unique name for the unit
         /// @param unit The compilation unit to add
-        void add_unit(const std::string &unit_name, std::shared_ptr<CompilationUnit> unit);
+        void add_unit(const std::string &unit_name, std::unique_ptr<CompilationUnit> unit);
 
         void set_output_file(const std::string &file);
 
@@ -242,7 +264,7 @@ namespace jcc
         bool run_job_internal();
     };
 
-    void panic(const std::string &message, std::vector<std::shared_ptr<CompilerMessage>> &messages);
+    void panic(const std::string &message, std::vector<std::shared_ptr<CompilerMessage>> messages);
 }
 
 #endif // _JCC_COMPILE_HPP_

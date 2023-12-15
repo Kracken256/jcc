@@ -7,7 +7,7 @@
 #include <openssl/crypto.h>
 #include <mutex>
 #include <functional>
-#include "jcc/compile.hpp"
+#include "compile.hpp"
 #include <algorithm>
 
 using namespace jcc;
@@ -240,9 +240,9 @@ int main(int argc, char **argv)
 
     for (auto file : mode.input_files)
     {
-        auto unit = std::make_shared<CompilationUnit>();
+        auto unit = std::make_unique<CompilationUnit>();
         unit->add_file(file);
-        job.add_unit(file, unit);
+        job.add_unit(file, std::move(unit));
     }
 
     job.run_job();

@@ -118,7 +118,7 @@ std::string jcc::CompilerMessage::message() const
         part3 = "Info: ";
         break;
     default:
-        throw std::runtime_error("CompilerMessage::message(): Unknown message type");
+        panic("CompilerMessage::message(): Unknown message type", {});
     }
 
     part4 = this->m_message;
@@ -159,7 +159,7 @@ std::string jcc::CompilerMessage::ansi_message() const
         part3 = "\x1b[36;49;1mInfo:\x1b[0m ";
         break;
     default:
-        throw std::runtime_error("CompilerMessage::ansi_message(): Unknown message type");
+        panic("CompilerMessage::ansi_message(): Unknown message type", {});
     }
 
     part4 = this->m_message;
@@ -199,14 +199,14 @@ static std::string base58_encode(const std::string &input)
     std::reverse(output.begin(), output.end());
     return output;
 }
-#else 
+#else
 
 static std::string base58_encode(const std::string &input)
 {
     return "";
 }
 
-#endif 
+#endif
 
 static uint32_t unix_timestamp()
 {
@@ -258,7 +258,7 @@ static std::string compute_sha256(const std::string &message)
 
     return std::string((char *)hash, md_len);
 }
-#else 
+#else
 static std::string compute_sha256(const std::string &message)
 {
     BYTE hash[SHA256_BLOCK_SIZE];
@@ -271,7 +271,7 @@ static std::string compute_sha256(const std::string &message)
     return std::string((char *)hash, SHA256_BLOCK_SIZE);
 }
 
-#endif 
+#endif
 
 void jcc::CompilerMessage::generate_hash()
 {
@@ -316,11 +316,13 @@ void jcc::CompilerMessage::generate_hash()
 jcc::CompilationUnit::CompilationUnit()
 {
     m_files = {};
+    m_current_file = 0;
     m_flags = {};
     m_output_file = "";
+    m_cxx_temp_files = {};
+    m_obj_temp_files = {};
     m_messages = {};
     m_success = false;
-    m_current_file = 0;
 }
 
 bool jcc::CompilationUnit::add_file(const std::string &file)
@@ -409,12 +411,97 @@ std::vector<jcc::CompilerInfo> jcc::CompilationUnit::infos() const
     return infos;
 }
 
+bool jcc::CompilationUnit::invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags)
+{
+    (void)input_cxx;
+    (void)output_obj;
+    (void)flags;
+    /// TODO: Implement
+    return false;
+}
+
+bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags)
+{
+    (void)input_objs;
+    (void)outputname;
+    (void)flags;
+    /// TODO: Implement
+    return false;
+}
+
+void jcc::CompilationUnit::reset_instance()
+{
+    this->m_files.clear();
+    this->m_messages.clear();
+    this->m_success = false;
+    this->m_current_file = 0;
+    this->m_cxx_temp_files.clear();
+    this->m_obj_temp_files.clear();
+}
+
+static std::vector<std::string> parse_env_list(const char *val)
+{
+    std::vector<std::string> list;
+
+    while (*val != '\0')
+    {
+        std::string flag;
+
+        while (*val != '\0' && *val != ' ')
+        {
+            flag += *val;
+            val++;
+        }
+
+        if (!flag.empty())
+        {
+            list.push_back(flag);
+        }
+
+        if (*val == '\0')
+        {
+            break;
+        }
+
+        val++;
+    }
+
+    return list;
+}
+
 bool jcc::CompilationUnit::build()
 {
+    const char *env_jcc_helper, *env_jcc_helper_flags, *env_jcc_ld, *env_jcc_ldflags;
+    std::vector<std::string> cxx_flags, ld_flags;
+
     this->m_success = false;
 
-    /// TODO: implement
-    // this->push_message(CompilerMessageType::Warning, "Compiler not implemented yet");
+    if ((env_jcc_helper = std::getenv("JCC_CXX")) == NULL)
+    {
+        this->push_message(CompilerMessageType::Error, "JCC_CXX environment variable not set. Unable to compile generated C++ code. Set the variable to the path of a compatible C++ compiler.");
+        return false;
+    }
+
+    if ((env_jcc_helper_flags = std::getenv("JCC_CXX_FLAGS")) == NULL)
+    {
+        this->push_message(CompilerMessageType::Info, "JCC_CXX_FLAGS environment variable not set. Using default flags.");
+        env_jcc_helper_flags = "";
+    }
+
+    if ((env_jcc_ld = std::getenv("JCC_LD")) == NULL)
+    {
+        this->push_message(CompilerMessageType::Error, "JCC_LD environment variable not set. Unable to link generated object files. Set the variable to the path of a compatible linker.");
+        return false;
+    }
+
+    if ((env_jcc_ldflags = std::getenv("JCC_LDFLAGS")) == NULL)
+    {
+        this->push_message(CompilerMessageType::Error, "JCC_LDFLAGS environment variable not set. Using default flags.");
+        env_jcc_ldflags = "";
+    }
+
+    cxx_flags = parse_env_list(env_jcc_helper_flags);
+    ld_flags = parse_env_list(env_jcc_ldflags);
 
     for (const auto &file : this->m_files)
     {
@@ -422,6 +509,39 @@ bool jcc::CompilationUnit::build()
         {
             return false;
         }
+    }
+
+    /// TODO: Debug code, remove later
+    if (this->m_cxx_temp_files.size() != m_files.size())
+    {
+        m_success = true;
+        return true;
+    }
+
+    // foreach in m_temp_files map
+    for (const auto &file : this->m_cxx_temp_files)
+    {
+        std::string objpath;
+        if (!invoke_jcc_helper_cxx2obj(file.second, objpath, cxx_flags))
+        {
+            this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
+            return false;
+        }
+
+        // add to m_obj_temp_files map
+        m_obj_temp_files[file.second] = objpath;
+    }
+
+    std::vector<std::string> obj_files;
+    for (const auto &file : this->m_obj_temp_files)
+    {
+        obj_files.push_back(file.second);
+    }
+
+    if (!invoke_jcc_helper_ld(obj_files, this->m_output_file, ld_flags))
+    {
+        this->push_message(CompilerMessageType::Error, "Downstream linking failed. Failed to link generated object files.");
+        return false;
     }
 
     this->m_success = true;
@@ -638,14 +758,14 @@ jcc::CompilationJob::CompilationJob()
     m_progress = 0;
 }
 
-void jcc::CompilationJob::add_unit(const std::string &unit_name, std::shared_ptr<jcc::CompilationUnit> unit)
+void jcc::CompilationJob::add_unit(const std::string &unit_name, std::unique_ptr<jcc::CompilationUnit> unit)
 {
     if (m_units.find(unit_name) != m_units.end())
     {
         throw std::runtime_error("jcc::CompilationJob::add_unit(): Unit with name '" + unit_name + "' already exists");
     }
 
-    m_units[unit_name] = unit;
+    m_units[unit_name] = std::move(unit);
 }
 
 void jcc::CompilationJob::set_output_file(const std::string &output_file)
@@ -818,33 +938,52 @@ static void print_stacktrace()
 
     for (size_t i = 0; i < size; i++)
     {
-        // std::cerr << strings[i] << std::endl;
-        std::cerr << "\x1b[37;49m" << strings[i] << "\x1b[0m" << std::endl;
+        std::cerr << "   \x1b[37;49m" << strings[i] << "\x1b[0m" << std::endl;
     }
+
+    std::cerr << std::endl;
 
     free(strings);
 }
 #else
 static void print_stacktrace()
 {
-    std::cerr << "Stacktrace: Not implemented for this platform" << std::endl;
+    std::cerr << "Stacktrace: Not implemented for this platform.\n"
+              << std::endl;
 }
 #endif
 
-void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::CompilerMessage>> &messages)
+void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::CompilerMessage>> messages)
 {
     static std::atomic<bool> panic_called = false;
 
     if (panic_called)
     {
+        // prevent infinite recursion
+
+        // what is this called? A function sink?
         while (1)
         {
+            std::terminate();
         }
     }
 
     panic_called = true;
 
     std::stringstream autoreport_id;
+
+    if (messages.size() > 5)
+    {
+        std::cerr << "\r\n\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1m" << message << "\x1b[0m\n"
+                  << std::endl;
+    }
+    else
+    {
+        std::cerr << "\r\n";
+    }
+
+    std::cerr << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+              << std::endl;
 
     for (const auto &message : messages)
     {
@@ -853,9 +992,10 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
         autoreport_id << message->message_raw() << "::";
     }
 
-    std::cerr << '\n';
+    std::cerr << "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+              << std::endl;
 
-    std::cerr << "\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1;4m" << message << "\x1b[0m\n"
+    std::cerr << "\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1m" << message << "\x1b[0m\n"
               << std::endl;
 
     print_stacktrace();
@@ -865,7 +1005,8 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
 
     // calculate autoreport id
     std::cerr << "\x1b[32;49mAutoreport ID:\x1b[0m \x1b[36;49;4m"
-              << "JCR0-" + base58_encode(compute_sha256(autoreport_id.str())) << "\x1b[0m" << std::endl;
+              << "JCR0-" + base58_encode(compute_sha256(autoreport_id.str())) << "\x1b[0m\n"
+              << std::endl;
 
     _exit(0);
 }
