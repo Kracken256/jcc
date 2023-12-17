@@ -9,6 +9,8 @@
 #include <queue>
 #include <mutex>
 #include <functional>
+#include <algorithm>
+#include <random>
 
 namespace jcc
 {
@@ -55,21 +57,21 @@ namespace jcc
         /// Getters & Setters
         ///=================================================================
 
-        /// @brief Get the T
+        /// @brief Get const T reference
         /// @return T
         const T &value() const { return this->m_value; }
 
-        /// @brief Set the T
-        /// @param value The value
-        void value(const T &value) { this->m_value = value; }
+        /// @brief Get writable T reference
+        /// @return T
+        T &value() { return this->m_value; }
 
-        /// @brief Get the Name
+        /// @brief Get const Name reference
         /// @return std::string
         const std::string &name() const { return this->m_name; }
 
-        /// @brief Set the Name
-        /// @param name Name must be unique or is automatically generated
-        void name(const std::string &name) { this->m_name = name; }
+        /// @brief Get writable Name reference
+        /// @return std::string
+        std::string &name() { return this->m_name; }
 
         /// @brief Get the Children
         /// @return std::vector<Node>
@@ -129,19 +131,31 @@ namespace jcc
         /// @return true if the child was removed. false if doesn't exist
         bool remove_child(const std::string &name)
         {
-            auto it = std::find_if(this->m_children.begin(), this->m_children.end(), [&](const std::shared_ptr<Node> &node)
-                                   { return node->m_name == name; });
+            std::stack<Node *> node_stack;
+            node_stack.push(this); // Start with the current node
 
-            if (it == this->m_children.end())
+            while (!node_stack.empty())
             {
-                return false;
+                Node *current = node_stack.top();
+                node_stack.pop();
+
+                if (current->m_name == name)
+                {
+                    current->m_parent = nullptr; // remove parent (us)
+                    this->m_children_named.erase(name);
+                    this->m_children.erase(std::find_if(this->m_children.begin(), this->m_children.end(), [&](const std::shared_ptr<Node> &node)
+                                                        { return node->m_name == name; }));
+
+                    return true;
+                }
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
             }
 
-            (*it)->m_parent = nullptr; // remove parent (us)
-            this->m_children_named.erase(name);
-            this->m_children.erase(it);
-
-            return true;
+            return false;
         }
 
         /// @brief Remove a child by index
@@ -161,6 +175,38 @@ namespace jcc
             this->m_children.erase(it);
 
             return true;
+        }
+
+        /// @brief Remove children if predicate function returns true
+        /// @param func The predicate function to use
+        /// @return Number of children removed
+        size_t remove_if(std::function<bool(const Node &)> func)
+        {
+            size_t count = 0;
+            std::stack<Node *> node_stack;
+            node_stack.push(this); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                Node *current = node_stack.top();
+                node_stack.pop();
+
+                if (func(*current))
+                {
+                    current->m_parent = nullptr; // remove parent (us)
+                    this->m_children_named.erase(current->m_name);
+                    this->m_children.erase(std::find_if(this->m_children.begin(), this->m_children.end(), [&](const std::shared_ptr<Node> &node)
+                                                        { return node->m_name == current->m_name; }));
+                    count++;
+                }
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
+            }
+
+            return count;
         }
 
         /// @brief Remove all children
@@ -217,33 +263,6 @@ namespace jcc
         /// @return true if the child exists, false if doesn't exist
         bool exists(const Node &node) const { return this->m_children_named.find(node.m_name) != this->m_children_named.end(); }
 
-        /// @brief Check if a child exists with value
-        /// @param value The value of the child
-        /// @return true if the child exists, false if doesn't exist
-        bool child_with_value(const T &value)
-        {
-            std::stack<const Node *> node_stack;
-            node_stack.push(this); // Start with the current node
-
-            while (!node_stack.empty())
-            {
-                const Node *current = node_stack.top();
-                node_stack.pop();
-
-                if (current->m_value == value)
-                {
-                    return true;
-                }
-
-                for (const auto &child : current->m_children)
-                {
-                    node_stack.push(child.get()); // Add children to the stack to visit later
-                }
-            }
-
-            return false;
-        }
-
         /// @brief Get the nodes parent
         /// @return The parent node
         std::shared_ptr<Node> parent() const { return this->m_parent; }
@@ -258,7 +277,7 @@ namespace jcc
 
         /// @brief Count the number of children
         /// @return size_t
-        size_t num_children() const
+        size_t count() const
         {
             size_t count = 0;
             std::stack<const Node *> node_stack;
@@ -269,62 +288,6 @@ namespace jcc
                 const Node *current = node_stack.top();
                 node_stack.pop();
                 count++; // Increment count for each node visited
-
-                for (const auto &child : current->m_children)
-                {
-                    node_stack.push(child.get()); // Add children to the stack to visit later
-                }
-            }
-
-            return count;
-        }
-
-        /// @brief Count the number of children with value
-        /// @param value The value of the child
-        /// @return size_t
-        size_t num_children_with_value(const T &value) const
-        {
-            size_t count = 0;
-            std::stack<const Node *> node_stack;
-            node_stack.push(this); // Start with the current node
-
-            while (!node_stack.empty())
-            {
-                const Node *current = node_stack.top();
-                node_stack.pop();
-
-                if (current->m_value == value)
-                {
-                    count++;
-                }
-
-                for (const auto &child : current->m_children)
-                {
-                    node_stack.push(child.get()); // Add children to the stack to visit later
-                }
-            }
-
-            return count;
-        }
-
-        /// @brief Count the number of children with value (ignores the name)
-        /// @param node The node to search for
-        /// @return size_t
-        size_t num_children(const Node &node) const
-        {
-            size_t count = 0;
-            std::stack<const Node *> node_stack;
-            node_stack.push(this); // Start with the current node
-
-            while (!node_stack.empty())
-            {
-                const Node *current = node_stack.top();
-                node_stack.pop();
-
-                if (current->m_value == node.m_value)
-                {
-                    count++;
-                }
 
                 for (const auto &child : current->m_children)
                 {
@@ -402,7 +365,7 @@ namespace jcc
         }
 
         /// @brief Depth first search
-        /// @param value The value of the node to search for
+        /// @param func The predicate function to use
         /// @param node The resulting node
         /// @return true if found, false if not found
         bool find_dfs(std::function<bool(const Node &)> func, Node &node) const
@@ -431,7 +394,7 @@ namespace jcc
         }
 
         /// @brief Breadth first search
-        /// @param value The value of the node to search for
+        /// @param func The predicate function to use
         /// @param node The resulting node
         /// @return true if found, false if not found
         bool find_bfs(std::function<bool(const Node &)> func, Node &node) const
@@ -460,7 +423,7 @@ namespace jcc
         }
 
         /// @brief Find shortest path to a node
-        /// @param name Name of the node to search for
+        /// @param name The name of the node to search for
         /// @param path The resulting path
         /// @return true if found, false if not found
         bool find_path(const std::string &name, std::vector<Node> &path) const
@@ -493,6 +456,175 @@ namespace jcc
             }
 
             return false;
+        }
+
+        /// @brief Calculate distance between two nodes
+        /// @param node other node
+        /// @return size_t
+        ssize_t distance(const Node &node) const
+        {
+            return this->distance(node.m_name);
+        }
+
+        /// @brief Calculate distance between two nodes
+        /// @param name The name of the other node
+        /// @return size_t
+        ssize_t distance(const std::string &name) const
+        {
+            std::vector<Node> path;
+            if (!this->find_path(name, path))
+            {
+                return -1;
+            }
+
+            return path.size() - 1;
+        }
+
+        /// @brief Get the depth of this node
+        /// @return size_t
+        size_t depth() const
+        {
+            size_t depth = 0;
+            const Node *current = this;
+
+            while (current->m_parent != nullptr)
+            {
+                current = current->m_parent.get();
+                depth++;
+            }
+
+            return depth;
+        }
+
+        /// @brief Get the total depth of the tree
+        /// @return size_t
+        size_t tree_depth() const
+        {
+            size_t depth = 0;
+            std::stack<const Node *> node_stack;
+            node_stack.push(this); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                const Node *current = node_stack.top();
+                node_stack.pop();
+
+                if (current->m_children.empty())
+                {
+                    size_t current_depth = 0;
+                    const Node *current_node = current;
+
+                    while (current_node->m_parent != nullptr)
+                    {
+                        current_node = current_node->m_parent.get();
+                        current_depth++;
+                    }
+
+                    if (current_depth > depth)
+                    {
+                        depth = current_depth;
+                    }
+                }
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
+            }
+
+            return depth;
+        }
+
+        /// @brief Depth first traversal
+        /// @param func The function to call on each node
+        size_t traverse_dfs(std::function<void(Node &)> func)
+        {
+            size_t count = 0;
+            std::stack<Node *> node_stack;
+            node_stack.push(this); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                Node *current = node_stack.top();
+                node_stack.pop();
+                func(*current);
+                count++; // Increment count for each node visited
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
+            }
+
+            return count;
+        }
+
+        /// @brief Breadth first traversal
+        /// @param func The function to call on each node
+        size_t traverse_bfs(std::function<void(Node &)> func)
+        {
+            size_t count = 0;
+            std::queue<Node *> node_queue;
+            node_queue.push(this); // Start with the current node
+
+            while (!node_queue.empty())
+            {
+                Node *current = node_queue.front();
+                node_queue.pop();
+                func(*current);
+                count++; // Increment count for each node visited
+
+                for (const auto &child : current->m_children)
+                {
+                    node_queue.push(child.get()); // Add children to the queue to visit later
+                }
+            }
+
+            return count;
+        }
+
+        ///=================================================================
+        /// Other
+        ///=================================================================
+
+        void invert()
+        {
+            std::stack<Node *> node_stack;
+            node_stack.push(this); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                Node *current = node_stack.top();
+                node_stack.pop();
+
+                std::reverse(current->m_children.begin(), current->m_children.end());
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
+            }
+        }
+
+        void random_reorder(uint64_t seed = 10)
+        {
+            std::stack<Node *> node_stack;
+            std::shuffle(this->m_children.begin(), this->m_children.end(), std::default_random_engine(seed));
+
+            node_stack.push(this); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                Node *current = node_stack.top();
+                node_stack.pop();
+
+                std::shuffle(current->m_children.begin(), current->m_children.end(), std::default_random_engine(seed));
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push(child.get()); // Add children to the stack to visit later
+                }
+            }
         }
 
         ///=================================================================
