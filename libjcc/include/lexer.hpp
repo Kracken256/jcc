@@ -202,7 +202,7 @@ namespace jcc
         /// @param source JXX source code raw string
         /// @return A vector of tokens
         /// @throw LexerException
-        static TokenList lex(const std::string &source, bool preprocess = true);
+        static TokenList lex(const std::string &source);
 
     private:
         Lexer() = default;

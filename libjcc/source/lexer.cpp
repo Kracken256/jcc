@@ -685,34 +685,29 @@ uint64_t normalize_number_literal(std::string &number, size_t column, size_t lin
 /// @param preprocess Whether to preprocess the source code
 /// @return A vector of tokens
 /// @note This is probably the most complex I have ever written. So expect bugs.
-jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
+jcc::TokenList jcc::Lexer::lex(const std::string &source)
 {
     /// TODO: Run unit tests on this function
-    std::string preprocessed = source, current_token;
+    std::string current_token;
     TokenList result;
     LexerState state = LexerState::Default;
     LexerStateModifier modifier = LexerStateModifier::None;
     size_t i = 0, src_length, line = 1, column = 1;
     bool found = false;
 
-    if (preprocess)
-    {
-        preprocessed += "\n";
-    }
-
-    src_length = preprocessed.length();
+    src_length = source.length();
 
     result.data().reserve(src_length / 3);
 
     while (i < src_length)
     {
-        char current_char = preprocessed[i];
+        char current_char = source[i];
 
         switch (state)
         {
         case LexerState::Default:
             // Check for single line comment
-            if (src_length - i >= 2 && current_char == '/' && preprocessed[i + 1] == '/')
+            if (src_length - i >= 2 && current_char == '/' && source[i + 1] == '/')
             {
                 state = LexerState::SingleLineComment;
                 i++;
@@ -721,7 +716,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
             }
 
             // Check for multi line comment
-            if (src_length - i >= 2 && current_char == '/' && preprocessed[i + 1] == '*')
+            if (src_length - i >= 2 && current_char == '/' && source[i + 1] == '*')
             {
                 state = LexerState::MultiLineComment;
                 i++;
@@ -746,7 +741,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
                         }
                         break;
                     case 2:
-                        if (current_char == op.first[0] && preprocessed[i + 1] == op.first[1])
+                        if (current_char == op.first[0] && source[i + 1] == op.first[1])
                         {
                             result.push_back(Token(TokenType::Operator, op.first));
                             i += op.second - 1;
@@ -754,7 +749,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
                         }
                         break;
                     case 3:
-                        if (current_char == op.first[0] && preprocessed[i + 1] == op.first[1] && preprocessed[i + 2] == op.first[2])
+                        if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2])
                         {
                             result.push_back(Token(TokenType::Operator, op.first));
                             i += op.second - 1;
@@ -762,7 +757,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
                         }
                         break;
                     case 4:
-                        if (current_char == op.first[0] && preprocessed[i + 1] == op.first[1] && preprocessed[i + 2] == op.first[2] && preprocessed[i + 3] == op.first[3])
+                        if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2] && source[i + 3] == op.first[3])
                         {
                             result.push_back(Token(TokenType::Operator, op.first));
                             i += op.second - 1;
@@ -770,7 +765,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
                         }
                         break;
                     case 6:
-                        if (current_char == op.first[0] && preprocessed[i + 1] == op.first[1] && preprocessed[i + 2] == op.first[2] && preprocessed[i + 3] == op.first[3] && preprocessed[i + 4] == op.first[4] && preprocessed[i + 5] == op.first[5])
+                        if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2] && source[i + 3] == op.first[3] && source[i + 4] == op.first[4] && source[i + 5] == op.first[5])
                         {
                             result.push_back(Token(TokenType::Operator, op.first));
                             i += op.second - 1;
@@ -808,7 +803,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
                         }
                         break;
                     case 2:
-                        if (current_char == sep.first[0] && preprocessed[i + 1] == sep.first[1])
+                        if (current_char == sep.first[0] && source[i + 1] == sep.first[1])
                         {
                             result.push_back(Token(TokenType::Punctuator, sep.first));
                             i++;
@@ -850,7 +845,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
             for (auto kw : lexKeywords)
             {
                 size_t kw_length = strlen(kw);
-                if (src_length - i >= kw_length && preprocessed.substr(i, kw_length) == kw)
+                if (src_length - i >= kw_length && source.substr(i, kw_length) == kw)
                 {
                     result.push_back(Token(TokenType::Keyword, kw));
                     i += kw_length - 1;
@@ -1143,7 +1138,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source, bool preprocess)
             }
             break;
         case LexerState::MultiLineComment:
-            if (src_length - i >= 2 && current_char == '*' && preprocessed[i + 1] == '/')
+            if (src_length - i >= 2 && current_char == '*' && source[i + 1] == '/')
             {
                 i += 2;
                 column += 2;
