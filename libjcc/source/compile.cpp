@@ -12,9 +12,11 @@
 #include <iomanip>
 #include <cstring>
 
+#define _JCC_BACKEND_
+#include "sha256.hpp"
+
 #if defined(__linux__)
 #include <execinfo.h>
-#include <openssl/evp.h>
 #include <gmpxx.h>
 #else
 #error "Cross-platform support is not implemented yet"
@@ -201,6 +203,8 @@ static std::string base58_encode(const std::string &input)
 }
 #else
 
+#error "Cross-platform support is not implemented yet"
+
 static std::string base58_encode(const std::string &input)
 {
     return "";
@@ -213,66 +217,6 @@ static uint32_t unix_timestamp()
     return (uint32_t)((uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() & 0xFFFFFFFF);
 }
 
-#if defined(__linux__)
-static std::string compute_sha256(const std::string &message)
-{
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    EVP_MD_CTX *mdctx = NULL;
-    const EVP_MD *md = NULL;
-    unsigned int md_len = 0;
-
-    md = EVP_get_digestbyname("sha256");
-
-    if (!md)
-    {
-        std::cerr << "jcc::compute_sha256(): Unable to get digest by name" << std::endl;
-        std::terminate();
-    }
-
-    mdctx = EVP_MD_CTX_new();
-    if (!mdctx)
-    {
-        std::cerr << "jcc::compute_sha256(): Unable to create digest context" << std::endl;
-        std::terminate();
-    }
-
-    if (1 != EVP_DigestInit_ex(mdctx, md, NULL))
-    {
-        std::cerr << "jcc::compute_sha256(): Unable to initialize digest" << std::endl;
-        std::terminate();
-    }
-
-    if (1 != EVP_DigestUpdate(mdctx, message.c_str(), message.size()))
-    {
-        std::cerr << "jcc::compute_sha256(): Unable to update digest" << std::endl;
-        std::terminate();
-    }
-
-    if (1 != EVP_DigestFinal_ex(mdctx, hash, &md_len))
-    {
-        std::cerr << "jcc::compute_sha256(): Unable to finalize digest" << std::endl;
-        std::terminate();
-    }
-
-    EVP_MD_CTX_free(mdctx);
-
-    return std::string((char *)hash, md_len);
-}
-#else
-static std::string compute_sha256(const std::string &message)
-{
-    BYTE hash[SHA256_BLOCK_SIZE];
-    SHA256_CTX ctx;
-
-    sha256_init(&ctx);
-    sha256_update(&ctx, (const BYTE *)message.c_str(), message.size());
-    sha256_final(&ctx, hash);
-
-    return std::string((char *)hash, SHA256_BLOCK_SIZE);
-}
-
-#endif
-
 void jcc::CompilerMessage::generate_hash()
 {
     std::string message;
@@ -283,7 +227,7 @@ void jcc::CompilerMessage::generate_hash()
 
     message = this->m_message + "::" + this->m_file + "::" + std::to_string(this->m_line) + "::" + std::to_string(this->m_column) + "::";
 
-    hash = compute_sha256(message);
+    hash = jcc::crypto::sha256(message);
 
     for (int i = 0; i < 8; i++)
     {
@@ -1005,7 +949,7 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
 
     // calculate autoreport id
     std::cerr << "\x1b[32;49mAutoreport ID:\x1b[0m \x1b[36;49;4m"
-              << "JCR0-" + base58_encode(compute_sha256(autoreport_id.str())) << "\x1b[0m\n"
+              << "JCR0-" + base58_encode(jcc::crypto::sha256(autoreport_id.str())) << "\x1b[0m\n"
               << std::endl;
 
     _exit(0);
