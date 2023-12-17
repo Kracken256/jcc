@@ -25,7 +25,6 @@ namespace jcc
         /// @brief Construct a new Node object
         Node()
         {
-            this->m_parent = nullptr;
             this->m_name = autogenerate_name();
             this->m_value = T();
             this->m_children = std::vector<std::shared_ptr<Node>>();
@@ -38,9 +37,25 @@ namespace jcc
         /// @param children Children of the node
         Node(T value, const std::string &name = "", const std::vector<Node> &children = {})
         {
-            this->m_parent = nullptr;
-            this->m_name = name;
+            if (name.empty())
+            {
+                this->m_name = autogenerate_name();
+            }
+            else
+            {
+                this->m_name = name;
+            }
+
             this->m_value = value;
+            this->m_children = std::vector<std::shared_ptr<Node>>();
+            this->m_children_named = std::map<std::string, std::shared_ptr<Node>>();
+            this->add_children(children);
+        }
+
+        Node(std::initializer_list<Node> children)
+        {
+            this->m_name = autogenerate_name();
+            this->m_value = T();
             this->m_children = std::vector<std::shared_ptr<Node>>();
             this->m_children_named = std::map<std::string, std::shared_ptr<Node>>();
             this->add_children(children);
@@ -49,7 +64,6 @@ namespace jcc
         /// @brief Destroy the Node object
         ~Node()
         {
-            this->m_parent = nullptr;
             this->erase_children();
         }
 
@@ -112,7 +126,6 @@ namespace jcc
                 this->m_children_named[child.m_name] = new_child;
             }
 
-            new_child->m_parent = us; // we are the parent
             this->m_children.push_back(new_child);
         }
 
@@ -141,7 +154,6 @@ namespace jcc
 
                 if (current->m_name == name)
                 {
-                    current->m_parent = nullptr; // remove parent (us)
                     this->m_children_named.erase(name);
                     this->m_children.erase(std::find_if(this->m_children.begin(), this->m_children.end(), [&](const std::shared_ptr<Node> &node)
                                                         { return node->m_name == name; }));
@@ -170,7 +182,6 @@ namespace jcc
             }
 
             auto it = std::next(m_children.begin(), index);
-            (*it)->m_parent = nullptr; // remove parent (us)
             this->m_children_named.erase((*it)->m_name);
             this->m_children.erase(it);
 
@@ -193,7 +204,6 @@ namespace jcc
 
                 if (func(*current))
                 {
-                    current->m_parent = nullptr; // remove parent (us)
                     this->m_children_named.erase(current->m_name);
                     this->m_children.erase(std::find_if(this->m_children.begin(), this->m_children.end(), [&](const std::shared_ptr<Node> &node)
                                                         { return node->m_name == current->m_name; }));
@@ -263,17 +273,9 @@ namespace jcc
         /// @return true if the child exists, false if doesn't exist
         bool exists(const Node &node) const { return this->m_children_named.find(node.m_name) != this->m_children_named.end(); }
 
-        /// @brief Get the nodes parent
-        /// @return The parent node
-        std::shared_ptr<Node> parent() const { return this->m_parent; }
-
         /// @brief Check if node is empty
         /// @return true if empty, false if not empty
         bool is_empty() const { return this->m_children.empty(); }
-
-        /// @brief Check if node is root
-        /// @return true if root, false if not root
-        bool is_root() const { return this->m_parent == nullptr; }
 
         /// @brief Count the number of children
         /// @return size_t
@@ -312,6 +314,25 @@ namespace jcc
         /// @return true if greater, false if not greater
         bool operator>(const Node &other) const { return this->m_name > other.m_name; }
 
+        void operator=(const Node &other)
+        {
+            size_t index = other.m_name.find("_");
+            if (index != std::string::npos)
+            {
+                this->m_name = other.m_name.substr(0, index) + "_" + std::to_string(std::stoi(other.m_name.substr(index + 1)) + 1);
+            }
+            else
+            {
+                this->m_name = other.m_name + "_1";
+            }
+
+            this->m_value = other.m_value;
+            this->m_children = other.m_children;
+            this->m_children_named = other.m_children_named;
+        }
+
+        void operator=(const T &value) { this->m_value = value; }
+
         /// @brief Get a child by name
         /// @param name The unique name of the child
         /// @return Node
@@ -321,8 +342,17 @@ namespace jcc
         /// @brief Get a child by name
         /// @param name The unique name of the child
         /// @return Node
-        /// @warning Panics if child doesn't exist
-        Node &operator[](const std::string &name) { return *this->m_children_named.at(name); }
+        /// @warning Creates child if doesn't exist
+        Node &operator[](const std::string &name)
+        {
+            // create subnodes if they don't exist
+            if (!this->m_children_named.contains(name))
+            {
+                this->add_child(Node<T>(T(), name));
+            }
+
+            return *this->m_children_named.at(name);
+        }
 
         /// @brief Get a child by index
         /// @param index The index of the child
@@ -339,30 +369,6 @@ namespace jcc
         ///=================================================================
         /// Traversal
         ///=================================================================
-
-        /// @brief Get the root node
-        /// @return Node
-        const Node &root() const
-        {
-            const Node *current = this;
-            while (current->m_parent != nullptr)
-            {
-                current = current->m_parent.get();
-            }
-            return *current;
-        }
-
-        /// @brief Get the root node
-        /// @return Node
-        Node &root()
-        {
-            Node *current = this;
-            while (current->m_parent != nullptr)
-            {
-                current = current->m_parent.get();
-            }
-            return *current;
-        }
 
         /// @brief Depth first search
         /// @param func The predicate function to use
@@ -480,59 +486,24 @@ namespace jcc
             return path.size() - 1;
         }
 
-        /// @brief Get the depth of this node
+        /// @brief Get the depth from the current node
         /// @return size_t
         size_t depth() const
         {
-            size_t depth = 0;
-            const Node *current = this;
-
-            while (current->m_parent != nullptr)
+            if (m_children.empty())
             {
-                current = current->m_parent.get();
-                depth++;
+                return 0; // Base case: If no children, depth is 0
             }
-
-            return depth;
-        }
-
-        /// @brief Get the total depth of the tree
-        /// @return size_t
-        size_t tree_depth() const
-        {
-            size_t depth = 0;
-            std::stack<const Node *> node_stack;
-            node_stack.push(this); // Start with the current node
-
-            while (!node_stack.empty())
+            else
             {
-                const Node *current = node_stack.top();
-                node_stack.pop();
-
-                if (current->m_children.empty())
+                size_t max_child_depth = 0;
+                for (const auto &child : m_children)
                 {
-                    size_t current_depth = 0;
-                    const Node *current_node = current;
-
-                    while (current_node->m_parent != nullptr)
-                    {
-                        current_node = current_node->m_parent.get();
-                        current_depth++;
-                    }
-
-                    if (current_depth > depth)
-                    {
-                        depth = current_depth;
-                    }
+                    size_t child_depth = child->depth();
+                    max_child_depth = std::max(max_child_depth, child_depth);
                 }
-
-                for (const auto &child : current->m_children)
-                {
-                    node_stack.push(child.get()); // Add children to the stack to visit later
-                }
+                return 1 + max_child_depth; // Add 1 to the maximum child depth to get the depth of the current node
             }
-
-            return depth;
         }
 
         /// @brief Depth first traversal
@@ -637,15 +608,8 @@ namespace jcc
         {
             std::string json = "{";
 
-            if (this->m_parent != nullptr)
-            {
-                json += "\"name\":\"" + this->json_escape_string(this->m_name) + "\",";
-                json += "\"value\":\"" + this->json_escape_string(std::to_string(this->m_value)) + "\",";
-            }
-            else
-            {
-                json += "\"name\":\"root\",\"value\":\"\",";
-            }
+            json += "\"name\":\"" + this->json_escape_string(this->m_name) + "\",";
+            json += "\"value\":\"" + this->json_escape_string(std::to_string(this->m_value)) + "\",";
 
             json += "\"children\":[";
 
@@ -668,14 +632,7 @@ namespace jcc
         {
             std::string xml = "";
 
-            if (this->m_parent != nullptr)
-            {
-                xml += "<node name=\"" + this->xml_escape_string(this->m_name) + "\" value=\"" + this->xml_escape_string(std::to_string(this->m_value)) + "\">";
-            }
-            else
-            {
-                xml += "<node name=\"root\" value=\"\">";
-            }
+            xml += "<node name=\"" + this->xml_escape_string(this->m_name) + "\" value=\"" + this->xml_escape_string(std::to_string(this->m_value)) + "\">";
 
             for (const auto &child : this->m_children)
             {
@@ -690,6 +647,7 @@ namespace jcc
         std::string to_ansi_string() const
         {
             std::string hr = "";
+            bool init = true;
 
             std::stack<std::pair<const Node *, size_t>> node_stack;
             node_stack.push({this, 1}); // Start with the current node
@@ -700,16 +658,17 @@ namespace jcc
                 size_t current_indent = node_stack.top().second;
                 node_stack.pop();
 
-                if (current->m_parent == nullptr)
+                if (init)
                 {
-                    hr += "╰╮" + current->m_name + "\n";
+                    hr += "═╗" + current->m_name + "\n";
+                    init = false;
                 }
 
                 for (size_t i = 0; i < current->m_children.size(); i++)
                 {
                     if (i == current->m_children.size() - 1)
                     {
-                        hr += std::string(current_indent, ' ') + "╰╮" + current->m_children[i]->m_name + "\n";
+                        hr += std::string(current_indent, ' ') + "╚╗" + current->m_children[i]->m_name + "\n";
                     }
                     else
                     {
@@ -729,6 +688,7 @@ namespace jcc
         std::string to_string() const
         {
             std::string hr = "";
+            bool init = true;
 
             std::stack<std::pair<const Node *, size_t>> node_stack;
             node_stack.push({this, 1}); // Start with the current node
@@ -739,9 +699,10 @@ namespace jcc
                 size_t current_indent = node_stack.top().second;
                 node_stack.pop();
 
-                if (current->m_parent == nullptr)
+                if (init)
                 {
                     hr += "+- " + current->m_name + "\n";
+                    init = false;
                 }
 
                 for (size_t i = 0; i < current->m_children.size(); i++)
@@ -781,15 +742,16 @@ namespace jcc
                 {
                     path_string.erase(path_string.size() - 4);
                 }
+
+                return path_string;
             }
 
-            return path_string;
+            return "None";
         }
 
     protected:
         T m_value;
         std::string m_name;
-        std::shared_ptr<Node> m_parent;
         std::vector<std::shared_ptr<Node>> m_children;
         std::map<std::string, std::shared_ptr<Node>> m_children_named;
 
