@@ -606,7 +606,7 @@ namespace jcc
             }
         }
 
-        void random_reorder(uint64_t seed = 10)
+        void shuffle(uint64_t seed = 10)
         {
             std::stack<Node *> node_stack;
             std::shuffle(this->m_children.begin(), this->m_children.end(), std::default_random_engine(seed));
@@ -685,6 +685,84 @@ namespace jcc
             xml += "</node>";
 
             return xml;
+        }
+
+        std::string to_ansi_string() const
+        {
+            std::string hr = "";
+
+            std::stack<std::pair<const Node *, size_t>> node_stack;
+            node_stack.push({this, 1}); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                const Node *current = node_stack.top().first;
+                size_t current_indent = node_stack.top().second;
+                node_stack.pop();
+
+                if (current->m_parent == nullptr)
+                {
+                    hr += "╰╮" + current->m_name + "\n";
+                }
+
+                for (size_t i = 0; i < current->m_children.size(); i++)
+                {
+                    if (i == current->m_children.size() - 1)
+                    {
+                        hr += std::string(current_indent, ' ') + "╰╮" + current->m_children[i]->m_name + "\n";
+                    }
+                    else
+                    {
+                        hr += std::string(current_indent, ' ') + "╟╴" + current->m_children[i]->m_name + "\n";
+                    }
+                }
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push({child.get(), current_indent + 1}); // Add children to the stack to visit later
+                }
+            }
+
+            return hr;
+        }
+
+        std::string to_string() const
+        {
+            std::string hr = "";
+
+            std::stack<std::pair<const Node *, size_t>> node_stack;
+            node_stack.push({this, 1}); // Start with the current node
+
+            while (!node_stack.empty())
+            {
+                const Node *current = node_stack.top().first;
+                size_t current_indent = node_stack.top().second;
+                node_stack.pop();
+
+                if (current->m_parent == nullptr)
+                {
+                    hr += "+- " + current->m_name + "\n";
+                }
+
+                for (size_t i = 0; i < current->m_children.size(); i++)
+                {
+                    if (i == current->m_children.size() - 1)
+                    {
+                        hr += std::string(current_indent, ' ') + "+- " + current->m_children[i]->m_name + "\n";
+                    }
+                    else
+                    {
+                        hr += std::string(current_indent, ' ') + "|- " + current->m_children[i]->m_name + "\n";
+                    }
+                }
+
+                for (const auto &child : current->m_children)
+                {
+                    node_stack.push({child.get(), current_indent + 1}); // Add children to the stack to visit later
+                }
+            }
+
+            return hr;
         }
 
         std::string findpath_string(const std::string &name) const
@@ -802,5 +880,23 @@ namespace jcc
         }
     };
 } // namespace jcc
+
+namespace std
+{
+    // overload std::to_string for Node
+    template <typename T>
+    std::string to_string(const jcc::Node<T> &node)
+    {
+        return node.to_string();
+    }
+
+    // overload <<
+    template <typename T>
+    std::ostream &operator<<(std::ostream &os, const jcc::Node<T> &node)
+    {
+        os << node.to_string();
+        return os;
+    }
+}
 
 #endif // _JCC_NODE_HPP_
