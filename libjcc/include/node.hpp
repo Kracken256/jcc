@@ -52,13 +52,12 @@ namespace jcc
             this->add_children(children);
         }
 
-        Node(std::initializer_list<Node> children)
+        Node(const Node &other)
         {
-            this->m_name = autogenerate_name();
-            this->m_value = T();
-            this->m_children = std::vector<std::shared_ptr<Node>>();
-            this->m_children_named = std::map<std::string, std::shared_ptr<Node>>();
-            this->add_children(children);
+            this->m_name = other.m_name;
+            this->m_value = other.m_value;
+            this->m_children = other.m_children;
+            this->m_children_named = other.m_children_named;
         }
 
         /// @brief Destroy the Node object
