@@ -1,5 +1,7 @@
 #include "compile.hpp"
+#include "preprocessor.hpp"
 #include "lexer.hpp"
+#include "parser.hpp"
 #include <stdexcept>
 #include <algorithm>
 #include <filesystem>
@@ -440,7 +442,7 @@ bool jcc::CompilationUnit::build()
 
     if ((env_jcc_ldflags = std::getenv("JCC_LDFLAGS")) == NULL)
     {
-        this->push_message(CompilerMessageType::Error, "JCC_LDFLAGS environment variable not set. Using default flags.");
+        this->push_message(CompilerMessageType::Info, "JCC_LDFLAGS environment variable not set. Using default flags.");
         env_jcc_ldflags = "";
     }
 
@@ -606,20 +608,6 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
         return false;
     }
 
-    return true;
-}
-
-bool jcc::CompilationUnit::compile_file(const std::string &file)
-{
-    std::string source_code;
-    TokenList tokens;
-
-    if (!read_source_code(file, source_code))
-    {
-        this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
-        return false;
-    }
-
     bool found_non_ascii = false;
     for (const auto &c : source_code)
     {
@@ -634,6 +622,20 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Info, "File contains non-ASCII characters. This is fine, just a heads up.");
     }
 
+    return true;
+}
+
+bool jcc::CompilationUnit::compile_file(const std::string &file)
+{
+    std::string source_code, preprocessed_code;
+    TokenList tokens;
+
+    if (!read_source_code(file, source_code))
+    {
+        this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
+        return false;
+    }
+
     if (source_code.empty())
     {
         this->push_message(CompilerMessageType::Info, "Disregarding empty file '" + file + "'");
@@ -642,7 +644,38 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
 
     try
     {
-        tokens = Lexer::lex(source_code);
+        preprocessed_code = Preprocessor::preprocess(source_code);
+    }
+    catch (const PreprocessorImportNotFoundException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Import not found: " + std::string(e.what()));
+        return false;
+    }
+    catch (const PreprocessorImportCyclicException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Cyclic import: " + std::string(e.what()));
+        return false;
+    }
+    catch (const PreprocessorTokenException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Invalid token: " + std::string(e.what()));
+        return false;
+    }
+    catch (const PreprocessorException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Preprocessor error: " + std::string(e.what()));
+        return false;
+    }
+    catch (const std::exception &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Internal compiler error: Preprocessor::preprocess(" + std::string(e.what()) + ")");
+        panic("Caught unexpected exception in Preprocessor::preprocess()", this->m_messages);
+        return false;
+    }
+
+    try
+    {
+        tokens = Lexer::lex(preprocessed_code);
     }
     catch (const LexerException &e)
     {
@@ -656,10 +689,36 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
+    AbstractSyntaxTree ast;
+
+    try
+    {
+        ast = Parser::parse(tokens, this->m_messages);
+    }
+    catch (const SyntaxError &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Parser error: " + std::string(e.what()));
+        return false;
+    }
+    catch (const SemanticError &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Semantic error: " + std::string(e.what()));
+        return false;
+    }
+    catch (const UnexpectedTokenError &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Unexpected token: " + std::string(e.what()));
+        return false;
+    }
+    catch (const std::exception &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Internal compiler error: Parser::parse(" + std::string(e.what()) + ")");
+        panic("Caught unexpected exception in Parser::parse()", this->m_messages);
+        return false;
+    }
+
     /// TODO: remove after debugging
     std::cout << tokens.to_json() << std::endl;
-
-    /// TODO: Implement parser
 
     /// TODO: Implement semantic analyzer
 
