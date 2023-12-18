@@ -115,21 +115,11 @@ namespace jcc
         bool m_locked;
     };
 
-    class LexerException : public std::exception
+    class LexerException : public std::runtime_error
     {
     public:
         LexerException(const std::string &message)
-            : m_message(message)
-        {
-        }
-
-        const char *what() const noexcept override
-        {
-            return m_message.c_str();
-        }
-
-    protected:
-        std::string m_message;
+            : std::runtime_error(message) {}
     };
 
     class LexerExceptionInvalid : public LexerException
@@ -205,8 +195,8 @@ namespace jcc
         static TokenList lex(const std::string &source);
 
     private:
-        Lexer() = default;
-        ~Lexer() = default;
+        Lexer() = delete;
+        ~Lexer() = delete;
     };
 }
 
