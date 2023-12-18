@@ -608,7 +608,7 @@ namespace jcc
             std::string json = "{";
 
             json += "\"name\":\"" + this->json_escape_string(this->m_name) + "\",";
-            json += "\"value\":\"" + this->json_escape_string(std::to_string(this->m_value)) + "\",";
+            json += "\"value\":" + std::to_string(this->m_value) + ",";
 
             json += "\"children\":[";
 

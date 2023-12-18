@@ -718,7 +718,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     }
 
     /// TODO: remove after debugging
-    std::cout << tokens.to_json() << std::endl;
+    std::cout << ast.value()->generate() << std::endl;
 
     /// TODO: Implement semantic analyzer
 
