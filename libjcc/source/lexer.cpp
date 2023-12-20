@@ -13,7 +13,7 @@
 /// jcc::Token class implementation
 ///=============================================================================
 
-static std::map<int, std::string> tokenTypeMap = {
+static std::map<jcc::TokenType, std::string> tokenTypeMap = {
     {jcc::TokenType::Unknown, "unknown"},
     {jcc::TokenType::Identifier, "identifier"},
     {jcc::TokenType::Keyword, "keyword"},
@@ -56,7 +56,7 @@ std::string jcc::Token::to_string() const
         return std::string("Identifier(\"" + std::get<std::string>(m_value) + "\")");
         break;
     case TokenType::Keyword:
-        return std::string("Keyword(" + std::string(std::get<const char *>(m_value)) + ")");
+        return std::string("Keyword(" + std::string(lexKeywordMapReverse.at(std::get<Keyword>(m_value))) + ")");
         break;
     case TokenType::NumberLiteral:
         return std::string("NumberLiteral(" + std::to_string(std::get<uint64_t>(m_value)) + ")");
@@ -67,10 +67,10 @@ std::string jcc::Token::to_string() const
         return std::string("StringLiteral(\"" + std::get<std::string>(m_value) + "\")");
         break;
     case TokenType::Operator:
-        return std::string("Operator('" + std::string(std::get<const char *>(m_value)) + "')");
+        return std::string("Operator('" + std::string(lexOperatorMapReverse.at(std::get<Operator>(m_value))) + "')");
         break;
     case TokenType::Punctuator:
-        return std::string("Punctuator('" + std::string(std::get<const char *>(m_value)) + "')");
+        return std::string("Punctuator('" + std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(m_value))) + "')");
         break;
     case TokenType::SingleLineComment:
         return std::string("SingleLineComment(\"" + std::get<std::string>(m_value) + "\")");
@@ -133,21 +133,12 @@ bool jcc::TokenList::is_locked() const
     return this->m_locked;
 }
 
-const std::vector<jcc::Token> &jcc::TokenList::tokens() const
-{
-    return this->m_tokens;
-}
-
 std::string jcc::TokenList::to_string() const
 {
     std::string result = "TokenList(";
 
     for (size_t i = 0; i < m_tokens.size(); i++)
     {
-        if (m_tokens[i].type() == TokenType::Whitespace || m_tokens[i].type() == TokenType::SingleLineComment || m_tokens[i].type() == TokenType::MultiLineComment)
-        {
-            continue;
-        }
         result += m_tokens[i].to_string();
 
         if (i != m_tokens.size() - 1)
@@ -175,7 +166,7 @@ std::string jcc::TokenList::to_json() const
 
         std::string dataString = "", escapedString = "";
         result += "{";
-        result += "\"t\":\"" + tokenTypeMap[static_cast<int>(m_tokens[i].type())] + "\",";
+        result += "\"t\":\"" + tokenTypeMap[static_cast<jcc::TokenType>(m_tokens[i].type())] + "\",";
 
         switch (m_tokens[i].type())
         {
@@ -183,7 +174,7 @@ std::string jcc::TokenList::to_json() const
             dataString = std::get<std::string>(m_tokens[i].value());
             break;
         case TokenType::Keyword:
-            dataString = std::string(std::get<const char *>(m_tokens[i].value()));
+            dataString = std::string(lexKeywordMapReverse.at(std::get<Keyword>(m_tokens[i].value())));
             break;
         case TokenType::NumberLiteral:
             dataString = std::to_string(std::get<uint64_t>(m_tokens[i].value()));
@@ -195,10 +186,10 @@ std::string jcc::TokenList::to_json() const
             dataString = std::get<std::string>(m_tokens[i].value());
             break;
         case TokenType::Operator:
-            dataString = std::string(std::get<const char *>(m_tokens[i].value()));
+            dataString = std::string(lexOperatorMapReverse.at(std::get<Operator>(m_tokens[i].value())));
             break;
         case TokenType::Punctuator:
-            dataString = std::string(std::get<const char *>(m_tokens[i].value()));
+            dataString = std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(m_tokens[i].value())));
             break;
         case TokenType::SingleLineComment:
             dataString = std::get<std::string>(m_tokens[i].value());
@@ -258,14 +249,29 @@ const jcc::Token &jcc::TokenList::operator[](size_t index) const
     return m_tokens.at(index);
 }
 
-void jcc::TokenList::pop_front()
+void jcc::TokenList::pop(size_t count)
 {
-    if (this->m_locked)
+    if (count > m_tokens.size())
     {
-        panic("Unable to pop_front from TokenList, it is locked", {});
+        panic("Unable to pop from TokenList, count is greater than size", {});
     }
 
-    m_tokens.erase(m_tokens.begin());
+    m_tokens.erase(m_tokens.begin(), m_tokens.begin() + count);
+}
+
+bool jcc::TokenList::eof() const
+{
+    return m_tokens.empty();
+}
+
+const jcc::Token &jcc::TokenList::peek(size_t index) const
+{
+    if (index >= m_tokens.size())
+    {
+        panic("Unable to peek TokenList, index out of bounds", {});
+    }
+
+    return m_tokens[index];
 }
 
 size_t jcc::TokenList::size() const
@@ -322,60 +328,6 @@ static std::vector<std::pair<const char *, unsigned int>> lexPunctuators = {
 };
 
 static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
-    // "+=",  // plus equals
-    // "-=",  // minus equals
-    // "*=",  // times equals
-    // "/=",  // floating divide equals
-    // "%=",  // modulus equals
-    // "//=", // floor divide equals
-
-    // "^^=",  // xor equals
-    // "||=",  // or equals
-    // "&&=",  // and equals
-    // "<<=",  // left shift equals
-    // ">>=",  // arithmetic right shift equals
-    // ">>>=", // unsigned right shift equals
-    // "|=",   // bitwise or equals
-    // "&=",   // bitwise and equals
-    // "^=",   // bitwise xor equals
-
-    // "<<", // left shift
-    // ">>", // right shift
-    // "==", // equals
-    // "!=", // not equals
-    // "&&", // and
-    // "||", // or
-    // "^^", // xor
-    // "<=", // less than or equal
-    // ">=", // greater than or equal
-    // "<",  // less than
-    // ">",  // greater than
-
-    // "=", // assign
-    // "??",
-    // "@",
-
-    // "//", // floor divide
-    // "++", // increment
-    // "--", // decrement
-    // "+",  // plus
-    // "-",  // minus
-    // "*",  // times
-    // "/",  // floating divide
-    // "%",  // modulus
-    // "&",  // bitwise and
-    // "|",  // bitwise or
-    // "^",  // bitwise xor
-    // "~",  // bitwise not
-    // "!",  // not
-
-    // "?",      // ternary
-    // "#",      // preprocessor
-    // ".",      // member access
-    // ",",      // comma
-    // "new",    // dynamic allocation
-    // "delete", // dynamic deallocation
-
     {"+=", 2}, // plus equals
     {"-=", 2}, // minus equals
     {"*=", 2}, // times equals
@@ -429,71 +381,6 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"new", 3},    // dynamic allocation
     {"delete", 6}, // dynamic deallocation
 };
-
-/// TODO: Formally define language defined keywords
-static std::set<const char *> lexKeywords = {
-    "namemap",
-    "namespace",
-    "using",
-    "export",
-    "global",
-    "infer",
-    "seal",
-    "unseal",
-    "class",
-    "struct",
-    "union",
-    "typedef",
-    "public",
-    "private",
-    "protected",
-    "claim",
-    "virtual",
-    "abstract",
-    "volatile",
-    "const",
-    "enum",
-    "static_map",
-    "explicit",
-    "extern",
-    "friend",
-    "operator",
-    "this",
-    "constructor",
-    "destructor",
-    "metaclass",
-    "metatype",
-    "metafunction",
-    "meta",
-    "static",
-    "sizeof",
-    "if",
-    "else",
-    "for",
-    "while",
-    "do",
-    "switch",
-    "return",
-    "fault",
-    "case",
-    "break",
-    "default",
-    "abort",
-    "throw",
-    "continue",
-    "intn",
-    "uintn",
-    "float",
-    "double",
-    "int",
-    "signed",
-    "unsigned",
-    "long",
-    "bool",
-    "bit",
-    "char",
-    "void",
-    "auto"};
 
 static const char lexIdentifierChars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 static const size_t lexIdentifierCharsLength = (sizeof(lexIdentifierChars) - 1) / sizeof(char);
@@ -685,7 +572,7 @@ uint64_t normalize_number_literal(std::string &number, size_t column, size_t lin
 /// @param preprocess Whether to preprocess the source code
 /// @return A vector of tokens
 /// @note This is probably the most complex I have ever written. So expect bugs.
-jcc::TokenList jcc::Lexer::lex(const std::string &source)
+jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
 {
     /// TODO: Run unit tests on this function
     std::string current_token;
@@ -735,7 +622,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 1:
                         if (current_char == op.first[0])
                         {
-                            result.push_back(Token(TokenType::Operator, op.first));
+                            result.push_back(Token(TokenType::Operator, lexOperatorMap.at(op.first)));
                             i += op.second - 1;
                             found = true;
                         }
@@ -743,7 +630,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 2:
                         if (current_char == op.first[0] && source[i + 1] == op.first[1])
                         {
-                            result.push_back(Token(TokenType::Operator, op.first));
+                            result.push_back(Token(TokenType::Operator, lexOperatorMap.at(op.first)));
                             i += op.second - 1;
                             found = true;
                         }
@@ -751,7 +638,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 3:
                         if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2])
                         {
-                            result.push_back(Token(TokenType::Operator, op.first));
+                            result.push_back(Token(TokenType::Operator, lexOperatorMap.at(op.first)));
                             i += op.second - 1;
                             found = true;
                         }
@@ -759,7 +646,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 4:
                         if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2] && source[i + 3] == op.first[3])
                         {
-                            result.push_back(Token(TokenType::Operator, op.first));
+                            result.push_back(Token(TokenType::Operator, lexOperatorMap.at(op.first)));
                             i += op.second - 1;
                             found = true;
                         }
@@ -767,7 +654,7 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 6:
                         if (current_char == op.first[0] && source[i + 1] == op.first[1] && source[i + 2] == op.first[2] && source[i + 3] == op.first[3] && source[i + 4] == op.first[4] && source[i + 5] == op.first[5])
                         {
-                            result.push_back(Token(TokenType::Operator, op.first));
+                            result.push_back(Token(TokenType::Operator, lexOperatorMap.at(op.first)));
                             i += op.second - 1;
                             found = true;
                         }
@@ -798,14 +685,14 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
                     case 1:
                         if (current_char == sep.first[0])
                         {
-                            result.push_back(Token(TokenType::Punctuator, sep.first));
+                            result.push_back(Token(TokenType::Punctuator, lexPunctuatorMap.at(sep.first)));
                             found = true;
                         }
                         break;
                     case 2:
                         if (current_char == sep.first[0] && source[i + 1] == sep.first[1])
                         {
-                            result.push_back(Token(TokenType::Punctuator, sep.first));
+                            result.push_back(Token(TokenType::Punctuator, lexPunctuatorMap.at(sep.first)));
                             i++;
                             found = true;
                         }
@@ -842,12 +729,12 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
 
             // Check for keyword
             found = false;
-            for (auto kw : lexKeywords)
+            for (auto kw : lexKeywordMap)
             {
-                size_t kw_length = strlen(kw);
-                if (src_length - i >= kw_length && source.substr(i, kw_length) == kw)
+                size_t kw_length = strlen(kw.first);
+                if (src_length - i >= kw_length && source.substr(i, kw_length) == kw.first)
                 {
-                    result.push_back(Token(TokenType::Keyword, kw));
+                    result.push_back(Token(TokenType::Keyword, kw.second));
                     i += kw_length - 1;
                     found = true;
                     break;
@@ -1241,6 +1128,8 @@ jcc::TokenList jcc::Lexer::lex(const std::string &source)
             break;
         }
     }
+
+    result.lock();
 
     return result;
 }

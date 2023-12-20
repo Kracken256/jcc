@@ -3,13 +3,14 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <variant>
 #include <exception>
 #include <stdexcept>
 
 namespace jcc
 {
-    enum TokenType
+    enum class TokenType
     {
         Unknown = -1,
         Identifier,
@@ -24,7 +25,408 @@ namespace jcc
         Whitespace,
     };
 
-    typedef std::variant<std::string, uint64_t, double, const char *> TokenValueType;
+    enum class Keyword
+    {
+        Namemap,
+        Namespace,
+        Using,
+        Export,
+        Global,
+        Infer,
+        Seal,
+        Unseal,
+        Class,
+        Struct,
+        Union,
+        Typedef,
+        Public,
+        Private,
+        Protected,
+        Claim,
+        Virtual,
+        Abstract,
+        Volatile,
+        Const,
+        Enum,
+        Static_map,
+        Explicit,
+        Extern,
+        Friend,
+        Operator,
+        This,
+        Constructor,
+        Destructor,
+        Metaclass,
+        Metatype,
+        Metafunction,
+        Meta,
+        Static,
+        Sizeof,
+        If,
+        Else,
+        For,
+        While,
+        Do,
+        Switch,
+        Return,
+        Fault,
+        Case,
+        Break,
+        Default,
+        Abort,
+        Throw,
+        Continue,
+        Intn,
+        Uintn,
+        Float,
+        Double,
+        Int,
+        Signed,
+        Unsigned,
+        Long,
+        Bool,
+        Bit,
+        Char,
+        Void,
+        Auto,
+    };
+
+    const std::map<const char *, jcc::Keyword> lexKeywordMap = {
+        {"namemap", jcc::Keyword::Namemap},
+        {"namespace", jcc::Keyword::Namespace},
+        {"using", jcc::Keyword::Using},
+        {"export", jcc::Keyword::Export},
+        {"global", jcc::Keyword::Global},
+        {"infer", jcc::Keyword::Infer},
+        {"seal", jcc::Keyword::Seal},
+        {"unseal", jcc::Keyword::Unseal},
+        {"class", jcc::Keyword::Class},
+        {"struct", jcc::Keyword::Struct},
+        {"union", jcc::Keyword::Union},
+        {"typedef", jcc::Keyword::Typedef},
+        {"public", jcc::Keyword::Public},
+        {"private", jcc::Keyword::Private},
+        {"protected", jcc::Keyword::Protected},
+        {"claim", jcc::Keyword::Claim},
+        {"virtual", jcc::Keyword::Virtual},
+        {"abstract", jcc::Keyword::Abstract},
+        {"volatile", jcc::Keyword::Volatile},
+        {"const", jcc::Keyword::Const},
+        {"enum", jcc::Keyword::Enum},
+        {"static_map", jcc::Keyword::Static_map},
+        {"explicit", jcc::Keyword::Explicit},
+        {"extern", jcc::Keyword::Extern},
+        {"friend", jcc::Keyword::Friend},
+        {"operator", jcc::Keyword::Operator},
+        {"this", jcc::Keyword::This},
+        {"constructor", jcc::Keyword::Constructor},
+        {"destructor", jcc::Keyword::Destructor},
+        {"metaclass", jcc::Keyword::Metaclass},
+        {"metatype", jcc::Keyword::Metatype},
+        {"metafunction", jcc::Keyword::Metafunction},
+        {"meta", jcc::Keyword::Meta},
+        {"static", jcc::Keyword::Static},
+        {"sizeof", jcc::Keyword::Sizeof},
+        {"if", jcc::Keyword::If},
+        {"else", jcc::Keyword::Else},
+        {"for", jcc::Keyword::For},
+        {"while", jcc::Keyword::While},
+        {"do", jcc::Keyword::Do},
+        {"switch", jcc::Keyword::Switch},
+        {"return", jcc::Keyword::Return},
+        {"fault", jcc::Keyword::Fault},
+        {"case", jcc::Keyword::Case},
+        {"break", jcc::Keyword::Break},
+        {"default", jcc::Keyword::Default},
+        {"abort", jcc::Keyword::Abort},
+        {"throw", jcc::Keyword::Throw},
+        {"continue", jcc::Keyword::Continue},
+        {"intn", jcc::Keyword::Intn},
+        {"uintn", jcc::Keyword::Uintn},
+        {"float", jcc::Keyword::Float},
+        {"double", jcc::Keyword::Double},
+        {"int", jcc::Keyword::Int},
+        {"signed", jcc::Keyword::Signed},
+        {"unsigned", jcc::Keyword::Unsigned},
+        {"long", jcc::Keyword::Long},
+        {"bool", jcc::Keyword::Bool},
+        {"bit", jcc::Keyword::Bit},
+        {"char", jcc::Keyword::Char},
+        {"void", jcc::Keyword::Void},
+        {"auto", jcc::Keyword::Auto}};
+
+    const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
+        {jcc::Keyword::Namemap, "namemap"},
+        {jcc::Keyword::Namespace, "namespace"},
+        {jcc::Keyword::Using, "using"},
+        {jcc::Keyword::Export, "export"},
+        {jcc::Keyword::Global, "global"},
+        {jcc::Keyword::Infer, "infer"},
+        {jcc::Keyword::Seal, "seal"},
+        {jcc::Keyword::Unseal, "unseal"},
+        {jcc::Keyword::Class, "class"},
+        {jcc::Keyword::Struct, "struct"},
+        {jcc::Keyword::Union, "union"},
+        {jcc::Keyword::Typedef, "typedef"},
+        {jcc::Keyword::Public, "public"},
+        {jcc::Keyword::Private, "private"},
+        {jcc::Keyword::Protected, "protected"},
+        {jcc::Keyword::Claim, "claim"},
+        {jcc::Keyword::Virtual, "virtual"},
+        {jcc::Keyword::Abstract, "abstract"},
+        {jcc::Keyword::Volatile, "volatile"},
+        {jcc::Keyword::Const, "const"},
+        {jcc::Keyword::Enum, "enum"},
+        {jcc::Keyword::Static_map, "static_map"},
+        {jcc::Keyword::Explicit, "explicit"},
+        {jcc::Keyword::Extern, "extern"},
+        {jcc::Keyword::Friend, "friend"},
+        {jcc::Keyword::Operator, "operator"},
+        {jcc::Keyword::This, "this"},
+        {jcc::Keyword::Constructor, "constructor"},
+        {jcc::Keyword::Destructor, "destructor"},
+        {jcc::Keyword::Metaclass, "metaclass"},
+        {jcc::Keyword::Metatype, "metatype"},
+        {jcc::Keyword::Metafunction, "metafunction"},
+        {jcc::Keyword::Meta, "meta"},
+        {jcc::Keyword::Static, "static"},
+        {jcc::Keyword::Sizeof, "sizeof"},
+        {jcc::Keyword::If, "if"},
+        {jcc::Keyword::Else, "else"},
+        {jcc::Keyword::For, "for"},
+        {jcc::Keyword::While, "while"},
+        {jcc::Keyword::Do, "do"},
+        {jcc::Keyword::Switch, "switch"},
+        {jcc::Keyword::Return, "return"},
+        {jcc::Keyword::Fault, "fault"},
+        {jcc::Keyword::Case, "case"},
+        {jcc::Keyword::Break, "break"},
+        {jcc::Keyword::Default, "default"},
+        {jcc::Keyword::Abort, "abort"},
+        {jcc::Keyword::Throw, "throw"},
+        {jcc::Keyword::Continue, "continue"},
+        {jcc::Keyword::Intn, "intn"},
+        {jcc::Keyword::Uintn, "uintn"},
+        {jcc::Keyword::Float, "float"},
+        {jcc::Keyword::Double, "double"},
+        {jcc::Keyword::Int, "int"},
+        {jcc::Keyword::Signed, "signed"},
+        {jcc::Keyword::Unsigned, "unsigned"},
+        {jcc::Keyword::Long, "long"},
+        {jcc::Keyword::Bool, "bool"},
+        {jcc::Keyword::Bit, "bit"},
+        {jcc::Keyword::Char, "char"},
+        {jcc::Keyword::Void, "void"},
+        {jcc::Keyword::Auto, "auto"}};
+
+    enum class Punctuator
+    {
+        OpenParen,
+        CloseParen,
+        OpenBrace,
+        CloseBrace,
+        OpenBracket,
+        CloseBracket,
+        Semicolon,
+        Colon,
+        Comma,
+        Period,
+        ScopeResolution,
+    };
+
+    const std::map<const char *, jcc::Punctuator> lexPunctuatorMap = {
+        {"(", jcc::Punctuator::OpenParen},
+        {")", jcc::Punctuator::CloseParen},
+        {"{", jcc::Punctuator::OpenBrace},
+        {"}", jcc::Punctuator::CloseBrace},
+        {"[", jcc::Punctuator::OpenBracket},
+        {"]", jcc::Punctuator::CloseBracket},
+        {";", jcc::Punctuator::Semicolon},
+        {":", jcc::Punctuator::Colon},
+        {",", jcc::Punctuator::Comma},
+        {".", jcc::Punctuator::Period},
+        {"::", jcc::Punctuator::ScopeResolution}};
+
+    const std::map<jcc::Punctuator, const char *> lexPunctuatorMapReverse = {
+        {jcc::Punctuator::OpenParen, "("},
+        {jcc::Punctuator::CloseParen, ")"},
+        {jcc::Punctuator::OpenBrace, "{"},
+        {jcc::Punctuator::CloseBrace, "}"},
+        {jcc::Punctuator::OpenBracket, "["},
+        {jcc::Punctuator::CloseBracket, "]"},
+        {jcc::Punctuator::Semicolon, ";"},
+        {jcc::Punctuator::Colon, ":"},
+        {jcc::Punctuator::Comma, ","},
+        {jcc::Punctuator::Period, "."},
+        {jcc::Punctuator::ScopeResolution, "::"}};
+
+    enum class Operator
+    {
+        PlusEquals,
+        MinusEquals,
+        TimesEquals,
+        FloatingDivideEquals,
+        ModulusEquals,
+
+        XorEquals,
+        OrEquals,
+        AndEquals,
+        LeftShiftEquals,
+        ArithmeticRightShiftEquals,
+        UnsignedRightShiftEquals,
+        BitwiseOrEquals,
+        BitwiseAndEquals,
+        BitwiseXorEquals,
+
+        LeftShift,
+        RightShift,
+        ArithmeticRightShift,
+        Equals,
+        NotEquals,
+        And,
+        Or,
+        Xor,
+        LessThanOrEqual,
+        GreaterThanOrEqual,
+        LessThan,
+        GreaterThan,
+
+        Assign,
+        NullCoalesce,
+        At,
+
+        FloorDivide,
+        Increment,
+        Decrement,
+        Plus,
+        Minus,
+        Times,
+        FloatingDivide,
+        Modulus,
+        BitwiseAnd,
+        BitwiseOr,
+        BitwiseXor,
+        BitwiseNot,
+        Not,
+
+        Ternary,
+        Preprocessor,
+        MemberAccess,
+        Comma,
+        New,
+        Delete,
+    };
+
+    const std::map<const char *, jcc::Operator> lexOperatorMap = {
+        {"+=", jcc::Operator::PlusEquals},
+        {"-=", jcc::Operator::MinusEquals},
+        {"*=", jcc::Operator::TimesEquals},
+        {"/=", jcc::Operator::FloatingDivideEquals},
+        {"%=", jcc::Operator::ModulusEquals},
+
+        {"^^=", jcc::Operator::XorEquals},
+        {"||=", jcc::Operator::OrEquals},
+        {"&&=", jcc::Operator::AndEquals},
+        {"<<=", jcc::Operator::LeftShiftEquals},
+        {">>=", jcc::Operator::ArithmeticRightShiftEquals},
+        {">>>=", jcc::Operator::UnsignedRightShiftEquals},
+        {"|=", jcc::Operator::BitwiseOrEquals},
+        {"&=", jcc::Operator::BitwiseAndEquals},
+        {"^=", jcc::Operator::BitwiseXorEquals},
+
+        {"<<", jcc::Operator::LeftShift},
+        {">>", jcc::Operator::RightShift},
+        {"==", jcc::Operator::Equals},
+        {"!=", jcc::Operator::NotEquals},
+        {"&&", jcc::Operator::And},
+        {"||", jcc::Operator::Or},
+        {"^^", jcc::Operator::Xor},
+        {"<=", jcc::Operator::LessThanOrEqual},
+        {">=", jcc::Operator::GreaterThanOrEqual},
+        {"<", jcc::Operator::LessThan},
+        {">", jcc::Operator::GreaterThan},
+
+        {"=", jcc::Operator::Assign},
+        {"??", jcc::Operator::NullCoalesce},
+        {"@", jcc::Operator::At},
+
+        {"//", jcc::Operator::FloorDivide},
+        {"++", jcc::Operator::Increment},
+        {"--", jcc::Operator::Decrement},
+        {"+", jcc::Operator::Plus},
+        {"-", jcc::Operator::Minus},
+        {"*", jcc::Operator::Times},
+        {"/", jcc::Operator::FloatingDivide},
+        {"%", jcc::Operator::Modulus},
+        {"&", jcc::Operator::BitwiseAnd},
+        {"|", jcc::Operator::BitwiseOr},
+        {"^", jcc::Operator::BitwiseXor},
+        {"~", jcc::Operator::BitwiseNot},
+        {"!", jcc::Operator::Not},
+
+        {"?", jcc::Operator::Ternary},
+        {"#", jcc::Operator::Preprocessor},
+        {".", jcc::Operator::MemberAccess},
+        {",", jcc::Operator::Comma},
+        {"new", jcc::Operator::New},
+        {"delete", jcc::Operator::Delete}};
+
+    const std::map<jcc::Operator, const char *> lexOperatorMapReverse = {
+        {jcc::Operator::PlusEquals, "+="},
+        {jcc::Operator::MinusEquals, "-="},
+        {jcc::Operator::TimesEquals, "*="},
+        {jcc::Operator::FloatingDivideEquals, "/="},
+        {jcc::Operator::ModulusEquals, "%="},
+
+        {jcc::Operator::XorEquals, "^^="},
+        {jcc::Operator::OrEquals, "||="},
+        {jcc::Operator::AndEquals, "&&="},
+        {jcc::Operator::LeftShiftEquals, "<<="},
+        {jcc::Operator::ArithmeticRightShiftEquals, ">>="},
+        {jcc::Operator::UnsignedRightShiftEquals, ">>>="},
+        {jcc::Operator::BitwiseOrEquals, "|="},
+        {jcc::Operator::BitwiseAndEquals, "&="},
+        {jcc::Operator::BitwiseXorEquals, "^="},
+
+        {jcc::Operator::LeftShift, "<<"},
+        {jcc::Operator::RightShift, ">>"},
+        {jcc::Operator::ArithmeticRightShift, ">>"},
+        {jcc::Operator::Equals, "=="},
+        {jcc::Operator::NotEquals, "!="},
+        {jcc::Operator::And, "&&"},
+        {jcc::Operator::Or, "||"},
+        {jcc::Operator::Xor, "^^"},
+        {jcc::Operator::LessThanOrEqual, "<="},
+        {jcc::Operator::GreaterThanOrEqual, ">="},
+        {jcc::Operator::LessThan, "<"},
+        {jcc::Operator::GreaterThan, ">"},
+
+        {jcc::Operator::Assign, "="},
+        {jcc::Operator::NullCoalesce, "??"},
+        {jcc::Operator::At, "@"},
+
+        {jcc::Operator::FloorDivide, "//"},
+        {jcc::Operator::Increment, "++"},
+        {jcc::Operator::Decrement, "--"},
+        {jcc::Operator::Plus, "+"},
+        {jcc::Operator::Minus, "-"},
+        {jcc::Operator::Times, "*"},
+        {jcc::Operator::FloatingDivide, "/"},
+        {jcc::Operator::Modulus, "%"},
+        {jcc::Operator::BitwiseAnd, "&"},
+        {jcc::Operator::BitwiseOr, "|"},
+        {jcc::Operator::BitwiseXor, "^"},
+        {jcc::Operator::BitwiseNot, "~"},
+        {jcc::Operator::Not, "!"},
+        {jcc::Operator::Ternary, "?"},
+        {jcc::Operator::Preprocessor, "#"},
+        {jcc::Operator::MemberAccess, "."},
+        {jcc::Operator::Comma, ","},
+        {jcc::Operator::New, "new"},
+        {jcc::Operator::Delete, "delete"}};
+
+    typedef std::variant<std::string, uint64_t, double, Operator, Keyword, Punctuator>
+        TokenValueType;
 
     class Token
     {
@@ -82,10 +484,6 @@ namespace jcc
         /// @return true if the list is locked
         bool is_locked() const;
 
-        /// @brief Get the tokens
-        /// @return std::vector<Token>
-        const std::vector<Token> &tokens() const;
-
         /// @brief Convert TokenList to a human-readable string
         /// @return std::string
         std::string to_string() const;
@@ -100,7 +498,16 @@ namespace jcc
         const Token &operator[](size_t index) const;
 
         /// @brief Pop the first token off the list
-        void pop_front();
+        void pop(size_t count = 1);
+
+        /// @brief Peek at a token
+        /// @param index The index of the token to peek at
+        /// @return Token
+        const Token &peek(size_t index = 0) const;
+
+        /// @brief Check if the list is empty
+        /// @return true if the list is empty
+        bool eof() const;
 
         /// @brief Get the size of the list
         /// @return size_t
@@ -110,8 +517,9 @@ namespace jcc
         /// @return std::vector<Token>
         std::vector<Token> &data();
 
-    private:
         std::vector<Token> m_tokens;
+
+    private:
         bool m_locked;
     };
 
@@ -183,20 +591,6 @@ namespace jcc
             : LexerExceptionUnexpected(message)
         {
         }
-    };
-
-    class Lexer
-    {
-    public:
-        /// @brief Perform lexical analysis on JXX source code
-        /// @param source JXX source code raw string
-        /// @return A vector of tokens
-        /// @throw LexerException
-        static TokenList lex(const std::string &source);
-
-    private:
-        Lexer() = delete;
-        ~Lexer() = delete;
     };
 }
 

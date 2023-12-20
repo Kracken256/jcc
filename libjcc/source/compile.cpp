@@ -1,7 +1,5 @@
 #include "compile.hpp"
 #include "preprocessor.hpp"
-#include "lexer.hpp"
-#include "parser.hpp"
 #include <stdexcept>
 #include <algorithm>
 #include <filesystem>
@@ -34,7 +32,7 @@ jcc::CompilerMessage::CompilerMessage()
     m_file = "";
     m_line = 0;
     m_column = 0;
-    m_type = CompilerMessageType::Common;
+    m_type = CompilerMessageType::Debug;
     m_hash = 0;
     m_longhash = "";
 
@@ -109,8 +107,8 @@ std::string jcc::CompilerMessage::message() const
 
     switch (this->m_type)
     {
-    case CompilerMessageType::Common:
-        part3 = "Generic: ";
+    case CompilerMessageType::Debug:
+        part3 = "Debug: ";
         break;
     case CompilerMessageType::Error:
         part3 = "Error: ";
@@ -150,8 +148,8 @@ std::string jcc::CompilerMessage::ansi_message() const
 
     switch (this->m_type)
     {
-    case CompilerMessageType::Common:
-        part3 = "Generic:\x1b[0m ";
+    case CompilerMessageType::Debug:
+        part3 = "\x1b[36;49;1mDebug:\x1b[0m ";
         break;
     case CompilerMessageType::Error:
         part3 = "\x1b[31;49;1mError:\x1b[0m ";
@@ -264,11 +262,24 @@ jcc::CompilationUnit::CompilationUnit()
     m_files = {};
     m_current_file = 0;
     m_flags = {};
-    m_output_file = "";
+    m_output_file = "a.out";
     m_cxx_temp_files = {};
     m_obj_temp_files = {};
     m_messages = {};
     m_success = false;
+}
+
+jcc::CompilationUnit::~CompilationUnit()
+{
+    for (const auto &file : this->m_cxx_temp_files)
+    {
+        std::remove(file.second.c_str());
+    }
+
+    for (const auto &file : this->m_obj_temp_files)
+    {
+        std::remove(file.second.c_str());
+    }
 }
 
 bool jcc::CompilationUnit::add_file(const std::string &file)
@@ -357,22 +368,71 @@ std::vector<jcc::CompilerInfo> jcc::CompilationUnit::infos() const
     return infos;
 }
 
-bool jcc::CompilationUnit::invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags)
+static std::string to_objname(const std::string &input_cxx)
 {
-    (void)input_cxx;
-    (void)output_obj;
-    (void)flags;
-    /// TODO: Implement
-    return false;
+    static uint64_t counter = 0;
+    static std::mutex counter_mutex;
+    static const char *hex = "0123456789abcdef";
+
+    std::lock_guard<std::mutex> lock(counter_mutex);
+
+    std::string result = "/tmp/jcc-";
+
+    // convert 64-bit counter to hex
+    for (int i = 0; i < 16; i++)
+    {
+        result += hex[(counter >> (i * 4)) & 0xF];
+    }
+
+    result += ".obj";
+
+    counter++;
+
+    return result;
 }
 
-bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags)
+bool jcc::CompilationUnit::invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags, const std::string &program)
 {
-    (void)input_objs;
-    (void)outputname;
-    (void)flags;
     /// TODO: Implement
-    return false;
+
+    // generate output filename
+    output_obj = to_objname(input_cxx);
+
+    std::string cmd = program + " " + input_cxx + " -o " + output_obj;
+
+    for (const auto &flag : flags)
+    {
+        cmd += " " + flag;
+    }
+
+    cmd += " -c"; // compile only
+
+    push_message(CompilerMessageType::Debug, "BUILD CMD: " + cmd);
+
+    return system(cmd.c_str()) == 0;
+}
+
+bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program)
+{
+    /// TODO: Implement
+
+    std::string ld_cmd = program + " ";
+
+    for (const auto &obj : input_objs)
+    {
+        ld_cmd += obj + " ";
+    }
+
+    ld_cmd += "-o " + outputname;
+
+    for (const auto &flag : flags)
+    {
+        ld_cmd += " " + flag;
+    }
+
+    push_message(CompilerMessageType::Debug, "BUILD CMD: " + ld_cmd);
+
+    return system(ld_cmd.c_str()) == 0;
 }
 
 void jcc::CompilationUnit::reset_instance()
@@ -468,7 +528,7 @@ bool jcc::CompilationUnit::build()
     for (const auto &file : this->m_cxx_temp_files)
     {
         std::string objpath;
-        if (!invoke_jcc_helper_cxx2obj(file.second, objpath, cxx_flags))
+        if (!invoke_jcc_helper_cxx2obj(file.second, objpath, cxx_flags, env_jcc_helper))
         {
             this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
             return false;
@@ -484,7 +544,7 @@ bool jcc::CompilationUnit::build()
         obj_files.push_back(file.second);
     }
 
-    if (!invoke_jcc_helper_ld(obj_files, this->m_output_file, ld_flags))
+    if (!invoke_jcc_helper_ld(obj_files, this->m_output_file, ld_flags, env_jcc_ld))
     {
         this->push_message(CompilerMessageType::Error, "Downstream linking failed. Failed to link generated object files.");
         return false;
@@ -635,13 +695,6 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
         return false;
     }
-
-    if (source_code.empty())
-    {
-        this->push_message(CompilerMessageType::Info, "Disregarding empty file '" + file + "'");
-        return true;
-    }
-
     try
     {
         preprocessed_code = Preprocessor::preprocess(source_code);
@@ -673,9 +726,15 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
+    if (preprocessed_code.empty())
+    {
+        this->push_message(CompilerMessageType::Info, "Disregarding empty file '" + file + "'");
+        return true;
+    }
+
     try
     {
-        tokens = Lexer::lex(preprocessed_code);
+        tokens = lex(preprocessed_code);
     }
     catch (const LexerException &e)
     {
@@ -689,11 +748,11 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
-    AbstractSyntaxTree ast;
+    std::shared_ptr<AbstractSyntaxTree> ast;
 
     try
     {
-        ast = Parser::parse(tokens, this->m_messages);
+        ast = parse(tokens);
     }
     catch (const SyntaxError &e)
     {
@@ -710,6 +769,11 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Error, "Unexpected token: " + std::string(e.what()));
         return false;
     }
+    catch (const ParserException &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Parser error: " + std::string(e.what()));
+        return false;
+    }
     catch (const std::exception &e)
     {
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Parser::parse(" + std::string(e.what()) + ")");
@@ -717,14 +781,44 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
-    /// TODO: remove after debugging
-    std::cout << ast.value()->generate() << std::endl;
+    if (ast == nullptr)
+    {
+        this->push_message(CompilerMessageType::Error, "Failed to parse source");
+        return false;
+    }
 
     /// TODO: Implement semantic analyzer
 
     /// TODO: Implement AST optimizer
 
-    /// TODO: Implement code generator
+    std::string cxx_code;
+
+    try
+    {
+        cxx_code = generate(ast);
+    }
+    catch (const std::exception &e)
+    {
+        this->push_message(CompilerMessageType::Error, "Internal compiler error: Generator::generate(" + std::string(e.what()) + ")");
+        panic("Caught unexpected exception in Generator::generate()", this->m_messages);
+        return false;
+    }
+
+    std::string temp_file = std::tmpnam(nullptr) + std::string(".cpp");
+
+    std::ofstream temp_file_stream(temp_file, std::ios::binary);
+
+    if (!temp_file_stream.is_open())
+    {
+        this->push_message(CompilerMessageType::Error, "Unable to open temporary file '" + temp_file + "' for writing");
+        return false;
+    }
+
+    temp_file_stream << cxx_code;
+
+    temp_file_stream.close();
+
+    this->m_cxx_temp_files[file] = temp_file;
 
     return true;
 }

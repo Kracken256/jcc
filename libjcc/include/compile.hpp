@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <atomic>
 #include <memory>
+#include "lexer.hpp"
+#include "parser.hpp"
 
 namespace jcc
 {
@@ -26,7 +28,7 @@ namespace jcc
 
     enum class CompilerMessageType
     {
-        Common,
+        Debug,
         Error,
         Warning,
         Info,
@@ -36,7 +38,7 @@ namespace jcc
     {
     public:
         CompilerMessage();
-        CompilerMessage(const std::string &message, const std::string &file, int line, int column, CompilerMessageType type = CompilerMessageType::Common);
+        CompilerMessage(const std::string &message, const std::string &file, int line, int column, CompilerMessageType type = CompilerMessageType::Debug);
 
         /// @brief Get plain message
         /// @return std::string
@@ -106,13 +108,18 @@ namespace jcc
         CompilerInfo(const std::string &message, const std::string &file, int line, int column) : CompilerMessage(message, file, line, column, CompilerMessageType::Info) {}
     };
 
+    enum class TargetLanguage
+    {
+        CXX,
+    };
+
     class CompilationUnit
     {
     public:
         /// @brief Construct a new CompilationUnit object
         /// @note The temporary output file is generated automatically by default
         CompilationUnit();
-        ~CompilationUnit() = default;
+        ~CompilationUnit();
 
         /// @brief Add a file to the compilation unit
         /// @param file The file to add
@@ -161,6 +168,24 @@ namespace jcc
         /// @brief Reset instance and clear all build-specific ephemeral data (keep user parameters)
         void reset_instance();
 
+        /// @brief Perform lexical analysis on JXX source code
+        /// @param source JXX source code raw string
+        /// @return A vector of tokens
+        /// @throw LexerException
+        TokenList lex(const std::string &source);
+
+        /// @brief Parse a list of tokens into an abstract syntax tree.
+        /// @param tokens Tokens to parse.
+        /// @return Abstract syntax tree.
+        /// @throw UnexpectedTokenError
+        std::shared_ptr<AbstractSyntaxTree> parse(const TokenList &tokens);
+
+        /// @brief Synthesize target language source code from an abstract syntax tree.
+        /// @param ast Abstract syntax tree.
+        /// @param target Target language.
+        /// @return Target language source code.
+        std::string generate(const std::shared_ptr<AbstractSyntaxTree> &ast, TargetLanguage target = TargetLanguage::CXX);
+
     private:
         std::vector<std::string> m_files;
         size_t m_current_file;
@@ -171,6 +196,8 @@ namespace jcc
         std::map<std::string, std::string> m_obj_temp_files;
         std::vector<std::shared_ptr<CompilerMessage>> m_messages;
         bool m_success;
+        std::string envcxx;
+        std::string envld;
 
         /// @brief Push a message to the compilation unit
         /// @param type The type of the message
@@ -197,7 +224,7 @@ namespace jcc
         /// @param flags Flags to pass to the compiler
         /// @return True if successful, false otherwise
         /// @note This function will populate the messages vector
-        bool invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags);
+        bool invoke_jcc_helper_cxx2obj(const std::string &input_cxx, std::string &output_obj, const std::vector<std::string> &flags, const std::string &program);
 
         /// @brief Invoke the JCC helper linker
         /// @param input_objs Input object files
@@ -205,7 +232,16 @@ namespace jcc
         /// @param flags Flags to pass to the linker
         /// @return True if successful, false otherwise
         /// @note This function will populate the messages vector
-        bool invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags);
+        bool invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program);
+
+        bool parse_code(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+
+        bool parse_block(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+
+        /// @brief Parse struct
+        bool parse_struct_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+
+        bool parse_namespace_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     };
 
     class CompilationJob
@@ -254,7 +290,6 @@ namespace jcc
         /// @brief Get the progress of the compilation job
         /// @return 0-100 progress
         uint8_t progress() const;
-
         bool success() const;
 
     private:
