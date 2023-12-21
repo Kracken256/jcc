@@ -533,9 +533,8 @@ namespace jcc
         /// @param tokens The vector of tokens to push
         void push_back(const std::vector<Token> &tokens);
 
-        /// @brief Lock the list
-        /// @details Once the list is locked, no more tokens can be pushed.
-        void lock();
+        /// @brief Finish building the list
+        void done();
 
         /// @brief Check if the list is locked
         /// @return true if the list is locked
@@ -570,14 +569,7 @@ namespace jcc
         /// @return size_t
         size_t size() const;
 
-        /// @brief Get the tokens. Throws exception if the list is locked.
-        /// @return std::vector<Token>
-        std::vector<Token> &data();
-
         std::vector<Token> m_tokens;
-
-    private:
-        bool m_locked;
     };
 
     class LexerException : public std::runtime_error

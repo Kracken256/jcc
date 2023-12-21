@@ -432,12 +432,11 @@ bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::string &input_obj, co
 
 void jcc::CompilationUnit::reset_instance()
 {
-    this->m_files.clear();
-    this->m_messages.clear();
-    this->m_success = false;
     this->m_current_file = 0;
     this->m_cxx_temp_files.clear();
     this->m_obj_temp_files.clear();
+    this->m_messages.clear();
+    this->m_success = false;
 }
 
 static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx)
@@ -973,6 +972,11 @@ const std::map<std::string, std::shared_ptr<jcc::CompilationUnit>> &jcc::Compila
 
 bool jcc::CompilationJob::run_job(bool detatch)
 {
+    for (auto &unit : this->m_units)
+    {
+        unit.second->reset_instance();
+    }
+
     if (detatch)
     {
         std::thread job_thread(&jcc::CompilationJob::run_job_internal, this);
@@ -980,7 +984,9 @@ bool jcc::CompilationJob::run_job(bool detatch)
         return true;
     }
 
-    return this->run_job_internal();
+    bool status = this->run_job_internal();
+
+    return status;
 }
 
 std::vector<std::shared_ptr<jcc::CompilerMessage>> jcc::CompilationJob::messages() const

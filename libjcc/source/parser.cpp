@@ -652,6 +652,7 @@ bool jcc::CompilationUnit::parse_code(jcc::TokenList &tokens, std::shared_ptr<jc
                 break;
             default:
                 throw SyntaxError("Unknown keyword: " + std::to_string((int)std::get<jcc::Keyword>(curtok.value())));
+                break;
             }
             break;
         case TokenType::NumberLiteral:
@@ -664,10 +665,6 @@ bool jcc::CompilationUnit::parse_code(jcc::TokenList &tokens, std::shared_ptr<jc
             break; // implement this
         case TokenType::Punctuator:
             break; // implement this
-        case TokenType::MultiLineComment:
-        case TokenType::SingleLineComment:
-        case TokenType::Whitespace:
-            throw SyntaxError("Unexpected token: " + std::to_string((int)curtok.type()));
         case TokenType::Unknown:
             panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
             break;
@@ -685,17 +682,15 @@ std::shared_ptr<jcc::AbstractSyntaxTree> jcc::CompilationUnit::parse(const jcc::
     TokenList tokens_copy = tokens;
 
     // remove whitespace and comments
-    for (auto it = tokens_copy.m_tokens.begin(); it != tokens_copy.m_tokens.end();)
+    auto shouldRemove = [](const Token &token)
     {
-        if (it->type() == TokenType::Whitespace || it->type() == TokenType::SingleLineComment || it->type() == TokenType::MultiLineComment)
-        {
-            it = tokens_copy.m_tokens.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
+        return token.type() == TokenType::Whitespace ||
+               token.type() == TokenType::SingleLineComment ||
+               token.type() == TokenType::MultiLineComment;
+    };
+
+    // Use remove_if along with erase to remove elements matching the condition
+    tokens_copy.m_tokens.erase(std::remove_if(tokens_copy.m_tokens.begin(), tokens_copy.m_tokens.end(), shouldRemove), tokens_copy.m_tokens.end());
 
     std::shared_ptr<GenericNode> rootnode;
 

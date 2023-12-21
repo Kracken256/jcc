@@ -94,54 +94,37 @@ std::string jcc::Token::to_string() const
 jcc::TokenList::TokenList()
 {
     this->m_tokens = std::vector<Token>();
-    this->m_locked = false;
 }
 
 jcc::TokenList::TokenList(const std::vector<jcc::Token> &tokens)
 {
     this->m_tokens = tokens;
-    this->m_locked = false;
 }
 
 void jcc::TokenList::push_back(const jcc::Token &token)
 {
-    if (this->m_locked)
-    {
-        panic("Unable to push_back to TokenList, it is locked", {});
-    }
-
     m_tokens.push_back(token);
 }
 
 void jcc::TokenList::push_back(const std::vector<jcc::Token> &tokens)
 {
-    if (this->m_locked)
-    {
-        panic("Unable to push_back vector to TokenList, it is locked", {});
-    }
-
     m_tokens.insert(m_tokens.end(), tokens.begin(), tokens.end());
 }
 
-void jcc::TokenList::lock()
+void jcc::TokenList::done()
 {
-    this->m_locked = true;
-}
-
-bool jcc::TokenList::is_locked() const
-{
-    return this->m_locked;
+    std::reverse(m_tokens.begin(), m_tokens.end());
 }
 
 std::string jcc::TokenList::to_string() const
 {
     std::string result = "TokenList(";
 
-    for (size_t i = 0; i < m_tokens.size(); i++)
+    for (size_t i = m_tokens.size(); i > 0; i--)
     {
-        result += m_tokens[i].to_string();
+        result += m_tokens[i - 1].to_string();
 
-        if (i != m_tokens.size() - 1)
+        if (i != 1)
         {
             result += ", ";
         }
@@ -153,7 +136,7 @@ std::string jcc::TokenList::to_string() const
 std::string jcc::TokenList::to_json() const
 {
     std::string result = "[";
-    for (size_t i = 0; i < m_tokens.size(); i++)
+    for (size_t i = m_tokens.size(); i > 0; i--)
     {
         if (m_tokens[i].type() == TokenType::Whitespace || m_tokens[i].type() == TokenType::SingleLineComment || m_tokens[i].type() == TokenType::MultiLineComment)
         {
@@ -256,7 +239,11 @@ void jcc::TokenList::pop(size_t count)
         panic("Unable to pop from TokenList, count is greater than size", {});
     }
 
-    m_tokens.erase(m_tokens.begin(), m_tokens.begin() + count);
+    m_tokens.pop_back();
+    for (size_t i = 0; i < count - 1; i++)
+    {
+        m_tokens.pop_back();
+    }
 }
 
 bool jcc::TokenList::eof() const
@@ -271,22 +258,12 @@ const jcc::Token &jcc::TokenList::peek(size_t index) const
         panic("Unable to peek TokenList, index out of bounds", {});
     }
 
-    return m_tokens[index];
+    return m_tokens[m_tokens.size() - index - 1];
 }
 
 size_t jcc::TokenList::size() const
 {
     return m_tokens.size();
-}
-
-std::vector<jcc::Token> &jcc::TokenList::data()
-{
-    if (this->m_locked)
-    {
-        panic("Unable to get data from TokenList, it is locked", {});
-    }
-
-    return m_tokens;
 }
 
 ///=============================================================================
@@ -583,8 +560,6 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
     bool found = false;
 
     src_length = source.length();
-
-    result.data().reserve(src_length / 3);
 
     while (i < src_length)
     {
@@ -1129,7 +1104,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
         }
     }
 
-    result.lock();
+    result.done();
 
     return result;
 }

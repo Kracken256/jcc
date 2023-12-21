@@ -196,8 +196,6 @@ namespace jcc
         std::map<std::string, std::string> m_obj_temp_files;
         std::vector<std::shared_ptr<CompilerMessage>> m_messages;
         bool m_success;
-        std::string envcxx;
-        std::string envld;
 
         /// @brief Push a message to the compilation unit
         /// @param type The type of the message

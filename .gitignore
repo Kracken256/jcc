@@ -2,4 +2,3 @@ build/
 .vscode/settings.json
 .vscode/c_cpp_properties.json
 bin/
-tests/*.j
