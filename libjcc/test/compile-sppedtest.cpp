@@ -66,7 +66,7 @@ int main()
     CompilationJob job;
     job.add_unit("tmp.j", std::move(unit));
 
-    for (size_t i = 0; i < 200; i++)
+    for (size_t i = 0; i < 400; i++)
     {
         start = 0;
         end = 0;

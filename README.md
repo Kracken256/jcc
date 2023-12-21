@@ -89,7 +89,7 @@ func add(a: int, b: int) -> int {
 }
 
 func main() {
-    let myAnonymousFunc = ():int => {
+    let myAnonymousFunc = (): int => {
         let a: int = 5
         let b: int = 10
         return add(a, b)
