@@ -19,7 +19,7 @@ static bool is_builtin_type(const std::string &type)
     }
 
     // complex types
-    if (type == "address" || type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "buffer" || type == "secbuffer" || type == "secstring" || type == "map" || type == "vector" || type == "routine")
+    if (type == "address" || type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "buffer" || type == "secbuffer" || type == "secstring" || type == "map" || type == "tensor" || type == "routine")
     {
         return true;
     }
