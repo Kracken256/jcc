@@ -368,7 +368,7 @@ std::vector<jcc::CompilerInfo> jcc::CompilationUnit::infos() const
     return infos;
 }
 
-static std::string to_objname(const std::string &input_cxx)
+static std::string to_objname()
 {
     static uint64_t counter = 0;
     static std::mutex counter_mutex;
@@ -396,7 +396,7 @@ bool jcc::CompilationUnit::invoke_jcc_helper_cxx2obj(const std::string &input_cx
     /// TODO: Implement
 
     // generate output filename
-    output_obj = to_objname(input_cxx);
+    output_obj = to_objname();
 
     std::string cmd = program + " " + input_cxx + " -o " + output_obj;
 
@@ -412,16 +412,11 @@ bool jcc::CompilationUnit::invoke_jcc_helper_cxx2obj(const std::string &input_cx
     return system(cmd.c_str()) == 0;
 }
 
-bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program)
+bool jcc::CompilationUnit::invoke_jcc_helper_ld(const std::string &input_obj, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program)
 {
     /// TODO: Implement
 
-    std::string ld_cmd = program + " ";
-
-    for (const auto &obj : input_objs)
-    {
-        ld_cmd += obj + " ";
-    }
+    std::string ld_cmd = program + " " + input_obj + " ";
 
     ld_cmd += "-o " + outputname;
 
@@ -445,40 +440,95 @@ void jcc::CompilationUnit::reset_instance()
     this->m_obj_temp_files.clear();
 }
 
-static std::vector<std::string> parse_env_list(const char *val)
+static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx)
 {
-    std::vector<std::string> list;
+    std::ofstream output_cxx_stream(output_cxx, std::ios::binary);
 
-    while (*val != '\0')
+    if (!output_cxx_stream.is_open())
     {
-        std::string flag;
-
-        while (*val != '\0' && *val != ' ')
-        {
-            flag += *val;
-            val++;
-        }
-
-        if (!flag.empty())
-        {
-            list.push_back(flag);
-        }
-
-        if (*val == '\0')
-        {
-            break;
-        }
-
-        val++;
+        return false;
     }
 
-    return list;
+    jcc::crypto::SHA256_CTX sha256_ctx;
+    jcc::crypto::sha256_init(sha256_ctx);
+
+    uint32_t _unix_timestamp = ::unix_timestamp();
+
+    // print header
+    output_cxx_stream << "//==================================================================//\n"
+                      << "// Type: J++ Transpiled Code                                        //\n"
+                      << "// Date: " << std::put_time(std::localtime((const time_t *)&_unix_timestamp), "%c %Z") << "                               //\n"
+                      << "//==================================================================//\n"
+                      << "\n";
+
+    for (const auto &file : cxx_files)
+    {
+        std::ifstream input_cxx_stream(file, std::ios::binary);
+
+        if (!input_cxx_stream.is_open())
+        {
+            output_cxx_stream.close();
+            return false;
+        }
+
+        std::string fname_padded = file;
+        if (fname_padded.size() > 58)
+        {
+            fname_padded = "..." + fname_padded.substr(fname_padded.size() - 55);
+        }
+        else
+        {
+            fname_padded.resize(58, ' ');
+        }
+
+        output_cxx_stream << "//==================================================================//\n"
+                          << "// File: " << fname_padded << " //\n"
+                          << "//==================================================================//\n"
+                          << "\n";
+
+        std::stringstream input_cxx_stream_copy;
+        input_cxx_stream_copy << input_cxx_stream.rdbuf();
+        std::string file_contents = input_cxx_stream_copy.str();
+
+        // update hash
+        jcc::crypto::sha256_update(sha256_ctx, (uint8_t *)file_contents.c_str(), file_contents.size());
+
+        // write to output
+        output_cxx_stream << file_contents;
+
+        output_cxx_stream << "\n//==================================================================//\n"
+                          << "// EOF: " << fname_padded << "  //\n"
+                          << "//==================================================================//\n";
+
+        input_cxx_stream.close();
+    }
+
+    // hex encode hash
+    uint8_t hash_bytes[32];
+    jcc::crypto::sha256_final(sha256_ctx, hash_bytes);
+    std::string encoded;
+    for (int i = 0; i < 32; i++)
+    {
+        encoded += "0123456789abcdef"[hash_bytes[i] >> 4];
+        encoded += "0123456789abcdef"[hash_bytes[i] & 0xF];
+    }
+
+    // print footer
+    output_cxx_stream << "\n//==================================================================//\n"
+                      << "// EOF: J++ Transpiled Code                                         //\n"
+                      << "// SHA256:                                                          //\n"
+                      << "// " << encoded << " //\n"
+                      << "//==================================================================//\n";
+
+    output_cxx_stream.close();
+
+    return true;
 }
 
 bool jcc::CompilationUnit::build()
 {
-    const char *env_jcc_helper, *env_jcc_helper_flags, *env_jcc_ld, *env_jcc_ldflags;
-    std::vector<std::string> cxx_flags, ld_flags;
+    const char *env_jcc_helper, *env_jcc_ld;
+    std::vector<std::string> cxx_flags;
 
     this->m_success = false;
 
@@ -488,26 +538,11 @@ bool jcc::CompilationUnit::build()
         return false;
     }
 
-    if ((env_jcc_helper_flags = std::getenv("JCC_CXX_FLAGS")) == NULL)
-    {
-        this->push_message(CompilerMessageType::Info, "JCC_CXX_FLAGS environment variable not set. Using default flags.");
-        env_jcc_helper_flags = "";
-    }
-
     if ((env_jcc_ld = std::getenv("JCC_LD")) == NULL)
     {
         this->push_message(CompilerMessageType::Error, "JCC_LD environment variable not set. Unable to link generated object files. Set the variable to the path of a compatible linker.");
         return false;
     }
-
-    if ((env_jcc_ldflags = std::getenv("JCC_LDFLAGS")) == NULL)
-    {
-        this->push_message(CompilerMessageType::Info, "JCC_LDFLAGS environment variable not set. Using default flags.");
-        env_jcc_ldflags = "";
-    }
-
-    cxx_flags = parse_env_list(env_jcc_helper_flags);
-    ld_flags = parse_env_list(env_jcc_ldflags);
 
     for (const auto &file : this->m_files)
     {
@@ -517,38 +552,82 @@ bool jcc::CompilationUnit::build()
         }
     }
 
-    /// TODO: Debug code, remove later
-    if (this->m_cxx_temp_files.size() != m_files.size())
+    std::vector<std::string> cxx_files;
+    for (const auto &file : this->m_cxx_temp_files)
     {
-        m_success = true;
+        cxx_files.push_back(file.second);
+    }
+
+    std::string cxx_output = this->m_output_file;
+
+    // produce single C++ file
+    if (!join_to_output_cxx(cxx_files, cxx_output))
+    {
+        this->push_message(CompilerMessageType::Error, "Failed to join generated C++ files into output file");
+        return false;
+    }
+
+    if (m_flags.find(CompileFlag::TranslateOnly) != m_flags.end())
+    {
+        // just translate to C++
+        this->m_success = true;
         return true;
     }
 
-    // foreach in m_temp_files map
-    for (const auto &file : this->m_cxx_temp_files)
+    for (auto flag : m_flags)
     {
-        std::string objpath;
-        if (!invoke_jcc_helper_cxx2obj(file.second, objpath, cxx_flags, env_jcc_helper))
+        switch (flag)
         {
-            this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
-            return false;
+        case CompileFlag::Debug:
+            cxx_flags.push_back("-g");
+            break;
+        case CompileFlag::OptimizeNone:
+            cxx_flags.push_back("-O0");
+            break;
+        case CompileFlag::OptimizeLight:
+            cxx_flags.push_back("-O1");
+            break;
+        case CompileFlag::OptimizeSpeed:
+            cxx_flags.push_back("-O2");
+            break;
+        case CompileFlag::OptimizeAggressive:
+            cxx_flags.push_back("-O3");
+            break;
+        case CompileFlag::OptimizeSize:
+            cxx_flags.push_back("-Os");
+            break;
+
+        default:
+            break;
         }
-
-        // add to m_obj_temp_files map
-        m_obj_temp_files[file.second] = objpath;
     }
 
-    std::vector<std::string> obj_files;
-    for (const auto &file : this->m_obj_temp_files)
+    std::string objpath;
+    if (!invoke_jcc_helper_cxx2obj(cxx_output, objpath, cxx_flags, env_jcc_helper))
     {
-        obj_files.push_back(file.second);
+        this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
+        return false;
     }
 
-    if (!invoke_jcc_helper_ld(obj_files, this->m_output_file, ld_flags, env_jcc_ld))
+    if (m_flags.find(CompileFlag::Object) != m_flags.end())
+    {
+        std::filesystem::copy(objpath, this->m_output_file, std::filesystem::copy_options::overwrite_existing);
+        std::remove(objpath.c_str());
+        std::remove(cxx_output.c_str());
+
+        this->m_success = true;
+
+        return true;
+    }
+
+    if (!invoke_jcc_helper_ld(objpath, m_output_file, {}, env_jcc_ld))
     {
         this->push_message(CompilerMessageType::Error, "Downstream linking failed. Failed to link generated object files.");
         return false;
     }
+
+    std::remove(objpath.c_str());
+    std::remove(cxx_output.c_str());
 
     this->m_success = true;
 
@@ -636,8 +715,8 @@ bool jcc::CompilationUnit::read_source_code(const std::string &filepath, std::st
 
     if (sizepos == 0)
     {
-        this->push_message(CompilerMessageType::Warning, "File '" + filepath + "' is empty");
         file.close();
+        source_code = "";
         return true;
     }
 
@@ -695,6 +774,13 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Info, "Disregarding file '" + file + "' due to previous errors");
         return false;
     }
+
+    if (source_code.empty())
+    {
+        this->push_message(CompilerMessageType::Info, "Disregarding empty file '" + file + "'");
+        return true;
+    }
+
     try
     {
         preprocessed_code = Preprocessor::preprocess(source_code);

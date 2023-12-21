@@ -6,7 +6,7 @@ std::string jcc::Preprocessor::preprocess(const std::string &source)
     std::string result;
 
     // wrap the entire source in a namespace for sanity
-    result += "namespace jxx_build {" + source + "\n}\n";
+    result += "namespace jxx {" + source + "\n}\n";
 
     return result;
 }

@@ -232,7 +232,7 @@ namespace jcc
         /// @param flags Flags to pass to the linker
         /// @return True if successful, false otherwise
         /// @note This function will populate the messages vector
-        bool invoke_jcc_helper_ld(const std::vector<std::string> &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program);
+        bool invoke_jcc_helper_ld(const std::string &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program);
 
         bool parse_code(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
 

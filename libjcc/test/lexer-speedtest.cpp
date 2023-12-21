@@ -1,4 +1,4 @@
-#include "lexer.hpp"
+#include "compile.hpp"
 #include <iostream>
 #include <chrono>
 #include <string>
@@ -67,6 +67,8 @@ int main()
     jcc::TokenList list;
     std::vector<uint64_t> times;
 
+    jcc::CompilationUnit unit;
+
     std::string raw = base64_decode(program);
 
     for (size_t i = 0; i < 400; i++)
@@ -76,7 +78,7 @@ int main()
         start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
         // Call the function you want to measure
-        list = Lexer::lex(raw);
+        list = unit.lex(raw);
 
         end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         // Calculate the elapsed clock cycles

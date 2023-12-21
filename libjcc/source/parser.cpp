@@ -551,7 +551,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
             switch (curtok.type())
             {
             case TokenType::StringLiteral:
-                field->default_value() = std::get<std::string>(curtok.value());
+                field->default_value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
                 break;
             case TokenType::NumberLiteral:
                 field->default_value() = std::to_string(std::get<uint64_t>(curtok.value()));

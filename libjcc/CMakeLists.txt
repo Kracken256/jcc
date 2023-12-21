@@ -23,7 +23,7 @@ file(GLOB_RECURSE HEADERS "source/*.h" "source/*.hpp")
 
 add_library(libjcc STATIC ${SOURCES} ${HEADERS})
 target_include_directories(libjcc PRIVATE include)
-target_compile_options(libjcc PRIVATE -O3 -Wall -Wextra -Wpedantic )
+target_compile_options(libjcc PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror -Wno-error=unused-parameter)
 target_link_libraries(libjcc PRIVATE crypto gmp)
 set_target_properties(libjcc PROPERTIES OUTPUT_NAME jcc)
 
