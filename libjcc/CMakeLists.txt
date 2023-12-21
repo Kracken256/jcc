@@ -23,7 +23,7 @@ file(GLOB_RECURSE HEADERS "source/*.h" "source/*.hpp")
 
 add_library(libjcc STATIC ${SOURCES} ${HEADERS})
 target_include_directories(libjcc PRIVATE include)
-target_compile_options(libjcc PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror -Wno-error=unused-parameter)
+target_compile_options(libjcc PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror)
 target_link_libraries(libjcc PRIVATE crypto gmp)
 set_target_properties(libjcc PROPERTIES OUTPUT_NAME jcc)
 
@@ -38,6 +38,6 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     target_link_libraries(test-${TEST_NAME} PRIVATE -static-libgcc -static-libstdc++ ${CRYPTO_LIB} ${GMP_LIB} )
     target_compile_options(test-${TEST_NAME} PRIVATE -O3 -Wall -Wextra -Wpedantic )
     add_custom_command(TARGET test-${TEST_NAME} POST_BUILD
-        COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/bin/tests
-        COMMAND mv $<TARGET_FILE:test-${TEST_NAME}> ${CMAKE_SOURCE_DIR}/bin/tests/${TEST_NAME})
+        COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/output/tests
+        COMMAND mv $<TARGET_FILE:test-${TEST_NAME}> ${CMAKE_SOURCE_DIR}/output/tests/${TEST_NAME})
 endforeach()

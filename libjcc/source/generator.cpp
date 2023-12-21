@@ -80,6 +80,8 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
     auto param = std::static_pointer_cast<FunctionParameter>(node);
     std::string result = param->type() + " " + param->name();
 
+    (void)indent;
+
     if (!param->default_value().empty())
     {
         result += " = " + param->default_value();
@@ -114,6 +116,8 @@ static std::string generate_class_declaration_cxx(const std::shared_ptr<jcc::Gen
 static std::string generate_extern_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent)
 {
     auto externdef = std::static_pointer_cast<ExternalDeclaration>(node);
+
+    (void)indent;
 
     /// TODO: Implement this function.
 
@@ -219,9 +223,6 @@ std::string jcc::CompilationUnit::generate(const std::shared_ptr<jcc::AbstractSy
     }
 
     result += generate_node_cxx(ast->root(), indent);
-
-    /// TODO: Remove this
-    result += "int main() { return 0; }\n";
 
     return result;
 }

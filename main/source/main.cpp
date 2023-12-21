@@ -180,7 +180,7 @@ bool parse_arguments(StringVector args, JccMode &mode)
         bool found = false;
         for (auto flag : mode.flags)
         {
-            if (flag == JccModeFlags::Object)
+            if (flag == JccModeFlags::TranslateOnly)
             {
                 found = true;
                 break;
@@ -188,11 +188,11 @@ bool parse_arguments(StringVector args, JccMode &mode)
         }
         if (found)
         {
-            mode.output_file = "a.out";
+            mode.output_file = "out.cpp";
         }
         else
         {
-            mode.output_file = "a.cpp";
+            mode.output_file = "a.out";
         }
     }
 

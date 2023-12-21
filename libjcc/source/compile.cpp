@@ -280,6 +280,11 @@ jcc::CompilationUnit::~CompilationUnit()
     {
         std::remove(file.second.c_str());
     }
+
+    if (std::filesystem::exists(this->m_output_file + ".cpp"))
+    {
+        std::remove((this->m_output_file + ".cpp").c_str());
+    }
 }
 
 bool jcc::CompilationUnit::add_file(const std::string &file)
@@ -502,6 +507,14 @@ static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const 
         input_cxx_stream.close();
     }
 
+    // append _start() symbol
+    output_cxx_stream << "\nextern \"C\" __attribute__((noreturn)) void _start(void) {\n"
+                      << "    int ret = main(void); // invoke main function\n\n"
+                      << "    /* Linux x86_64 syscall for sys_exit(ret); */\n"
+                      << "    asm volatile(\"mov $60, %rax; mov %0, %%rdi; syscall\" : : \"r\"(ret));\n\n"
+                      << "    while (1) asm volatile(\"hlt\"); // should never get here\n"
+                      << "}\n";
+
     // hex encode hash
     uint8_t hash_bytes[32];
     jcc::crypto::sha256_final(sha256_ctx, hash_bytes);
@@ -527,7 +540,8 @@ static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const 
 bool jcc::CompilationUnit::build()
 {
     const char *env_jcc_helper, *env_jcc_ld;
-    std::vector<std::string> cxx_flags;
+    std::vector<std::string> cxx_flags, cxx_files, ld_flags;
+    std::string cxx_output, objpath;
 
     this->m_success = false;
 
@@ -551,13 +565,18 @@ bool jcc::CompilationUnit::build()
         }
     }
 
-    std::vector<std::string> cxx_files;
+    if (this->m_cxx_temp_files.size() == 0)
+    {
+        this->push_message(CompilerMessageType::Info, "No files to compile");
+        return false;
+    }
+
     for (const auto &file : this->m_cxx_temp_files)
     {
         cxx_files.push_back(file.second);
     }
 
-    std::string cxx_output = this->m_output_file;
+    cxx_output = this->m_output_file + ".cpp";
 
     // produce single C++ file
     if (!join_to_output_cxx(cxx_files, cxx_output))
@@ -570,10 +589,13 @@ bool jcc::CompilationUnit::build()
     {
         // just translate to C++
         this->m_success = true;
+        // move output file
+        std::filesystem::copy(cxx_output, this->m_output_file, std::filesystem::copy_options::overwrite_existing);
+
         return true;
     }
 
-    for (auto flag : m_flags)
+    for (const auto flag : m_flags)
     {
         switch (flag)
         {
@@ -601,7 +623,14 @@ bool jcc::CompilationUnit::build()
         }
     }
 
-    std::string objpath;
+    // push default flags
+    cxx_flags.push_back("-std=c++20");
+    cxx_flags.push_back("-Wall");
+    cxx_flags.push_back("-Wextra");
+    cxx_flags.push_back("-Wpedantic");
+    cxx_flags.push_back("-Werror");
+    cxx_flags.push_back("-Wno-unused-parameter");
+
     if (!invoke_jcc_helper_cxx2obj(cxx_output, objpath, cxx_flags, env_jcc_helper))
     {
         this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
@@ -619,7 +648,21 @@ bool jcc::CompilationUnit::build()
         return true;
     }
 
-    if (!invoke_jcc_helper_ld(objpath, m_output_file, {}, env_jcc_ld))
+    ld_flags.push_back("-static");
+    ld_flags.push_back("-no-pie");
+    ld_flags.push_back("-nostdlib");
+    ld_flags.push_back("-nostdinc");
+    ld_flags.push_back("-nostdinc++");
+    ld_flags.push_back("-ffreestanding");
+    ld_flags.push_back("-nostartfiles");
+    ld_flags.push_back("-nodefaultlibs");
+    ld_flags.push_back("-Wl,--build-id=none");
+    ld_flags.push_back("-Wl,--gc-sections");
+    ld_flags.push_back("-Wl,--strip-all");
+    ld_flags.push_back("-Wl,--no-undefined");
+    ld_flags.push_back("-Wl,--entry=_start");
+
+    if (!invoke_jcc_helper_ld(objpath, m_output_file, ld_flags, env_jcc_ld))
     {
         this->push_message(CompilerMessageType::Error, "Downstream linking failed. Failed to link generated object files.");
         return false;
