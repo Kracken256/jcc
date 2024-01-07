@@ -37,6 +37,8 @@ namespace jcc
         Unseal,
         Class,
         Struct,
+        Region,
+        Func,
         Union,
         Typedef,
         Public,
@@ -107,7 +109,8 @@ namespace jcc
         Map,
         Tensor,
         Routine,
-        Void
+        Void,
+        Null,
     };
 
     const std::map<const char *, jcc::Keyword> lexKeywordMap = {
@@ -121,6 +124,8 @@ namespace jcc
         {"unseal", jcc::Keyword::Unseal},
         {"class", jcc::Keyword::Class},
         {"struct", jcc::Keyword::Struct},
+        {"region", jcc::Keyword::Region},
+        {"func", jcc::Keyword::Func},
         {"union", jcc::Keyword::Union},
         {"typedef", jcc::Keyword::Typedef},
         {"public", jcc::Keyword::Public},
@@ -191,7 +196,8 @@ namespace jcc
         {"map", jcc::Keyword::Map},
         {"tensor", jcc::Keyword::Tensor},
         {"routine", jcc::Keyword::Routine},
-        {"void", jcc::Keyword::Void}};
+        {"void", jcc::Keyword::Void},
+        {"null", jcc::Keyword::Null}};
 
     const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
         {jcc::Keyword::Namemap, "namemap"},
@@ -204,6 +210,8 @@ namespace jcc
         {jcc::Keyword::Unseal, "unseal"},
         {jcc::Keyword::Class, "class"},
         {jcc::Keyword::Struct, "struct"},
+        {jcc::Keyword::Region, "region"},
+        {jcc::Keyword::Func, "func"},
         {jcc::Keyword::Union, "union"},
         {jcc::Keyword::Typedef, "typedef"},
         {jcc::Keyword::Public, "public"},
@@ -243,7 +251,7 @@ namespace jcc
         {jcc::Keyword::Abort, "abort"},
         {jcc::Keyword::Throw, "throw"},
         {jcc::Keyword::Continue, "continue"},
-        
+
         {jcc::Keyword::Bit, "bit"},
         {jcc::Keyword::Byte, "byte"},
         {jcc::Keyword::Char, "char"},
@@ -274,7 +282,8 @@ namespace jcc
         {jcc::Keyword::Map, "map"},
         {jcc::Keyword::Tensor, "tensor"},
         {jcc::Keyword::Routine, "routine"},
-        {jcc::Keyword::Void, "void"}};
+        {jcc::Keyword::Void, "void"},
+        {jcc::Keyword::Null, "null"}};
 
     enum class Punctuator
     {
@@ -369,7 +378,6 @@ namespace jcc
         Ternary,
         Preprocessor,
         MemberAccess,
-        Comma,
         New,
         Delete,
     };
@@ -424,7 +432,6 @@ namespace jcc
         {"?", jcc::Operator::Ternary},
         {"#", jcc::Operator::Preprocessor},
         {".", jcc::Operator::MemberAccess},
-        {",", jcc::Operator::Comma},
         {"new", jcc::Operator::New},
         {"delete", jcc::Operator::Delete}};
 
@@ -478,7 +485,6 @@ namespace jcc
         {jcc::Operator::Ternary, "?"},
         {jcc::Operator::Preprocessor, "#"},
         {jcc::Operator::MemberAccess, "."},
-        {jcc::Operator::Comma, ","},
         {jcc::Operator::New, "new"},
         {jcc::Operator::Delete, "delete"}};
 
@@ -509,7 +515,6 @@ namespace jcc
         /// @return std::string
         std::string to_string() const;
 
-    private:
         TokenType m_type;
         TokenValueType m_value;
     };

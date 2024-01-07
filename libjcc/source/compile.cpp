@@ -212,7 +212,7 @@ static std::string base58_encode(const std::string &input)
 
 #endif
 
-static uint32_t unix_timestamp()
+uint32_t unix_timestamp()
 {
     return (uint32_t)((uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() & 0xFFFFFFFF);
 }
@@ -444,99 +444,6 @@ void jcc::CompilationUnit::reset_instance()
     this->m_success = false;
 }
 
-static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx)
-{
-    std::ofstream output_cxx_stream(output_cxx, std::ios::binary);
-
-    if (!output_cxx_stream.is_open())
-    {
-        return false;
-    }
-
-    jcc::crypto::SHA256_CTX sha256_ctx;
-    jcc::crypto::sha256_init(sha256_ctx);
-
-    uint32_t _unix_timestamp = ::unix_timestamp();
-
-    // print header
-    output_cxx_stream << "//==================================================================//\n"
-                      << "// Type: J++ Transpiled Code                                        //\n"
-                      << "// Date: " << std::put_time(std::localtime((const time_t *)&_unix_timestamp), "%c %Z") << "                               //\n"
-                      << "//==================================================================//\n"
-                      << "\n";
-
-    for (const auto &file : cxx_files)
-    {
-        std::ifstream input_cxx_stream(file, std::ios::binary);
-
-        if (!input_cxx_stream.is_open())
-        {
-            output_cxx_stream.close();
-            return false;
-        }
-
-        std::string fname_padded = file;
-        if (fname_padded.size() > 58)
-        {
-            fname_padded = "..." + fname_padded.substr(fname_padded.size() - 55);
-        }
-        else
-        {
-            fname_padded.resize(58, ' ');
-        }
-
-        output_cxx_stream << "//==================================================================//\n"
-                          << "// File: " << fname_padded << " //\n"
-                          << "//==================================================================//\n"
-                          << "\n";
-
-        std::stringstream input_cxx_stream_copy;
-        input_cxx_stream_copy << input_cxx_stream.rdbuf();
-        std::string file_contents = input_cxx_stream_copy.str();
-
-        // update hash
-        jcc::crypto::sha256_update(sha256_ctx, (uint8_t *)file_contents.c_str(), file_contents.size());
-
-        // write to output
-        output_cxx_stream << file_contents;
-
-        output_cxx_stream << "\n//==================================================================//\n"
-                          << "// EOF: " << fname_padded << "  //\n"
-                          << "//==================================================================//\n";
-
-        input_cxx_stream.close();
-    }
-
-    // append _start() symbol
-    output_cxx_stream << "\nextern \"C\" __attribute__((noreturn)) void _start(void) {\n"
-                      << "    int ret = main(void); // invoke main function\n\n"
-                      << "    /* Linux x86_64 syscall for sys_exit(ret); */\n"
-                      << "    asm volatile(\"mov $60, %rax; mov %0, %%rdi; syscall\" : : \"r\"(ret));\n\n"
-                      << "    while (1) asm volatile(\"hlt\"); // should never get here\n"
-                      << "}\n";
-
-    // hex encode hash
-    uint8_t hash_bytes[32];
-    jcc::crypto::sha256_final(sha256_ctx, hash_bytes);
-    std::string encoded;
-    for (int i = 0; i < 32; i++)
-    {
-        encoded += "0123456789abcdef"[hash_bytes[i] >> 4];
-        encoded += "0123456789abcdef"[hash_bytes[i] & 0xF];
-    }
-
-    // print footer
-    output_cxx_stream << "\n//==================================================================//\n"
-                      << "// EOF: J++ Transpiled Code                                         //\n"
-                      << "// SHA256:                                                          //\n"
-                      << "// " << encoded << " //\n"
-                      << "//==================================================================//\n";
-
-    output_cxx_stream.close();
-
-    return true;
-}
-
 bool jcc::CompilationUnit::build()
 {
     const char *env_jcc_helper, *env_jcc_ld;
@@ -649,18 +556,11 @@ bool jcc::CompilationUnit::build()
     }
 
     ld_flags.push_back("-static");
-    ld_flags.push_back("-no-pie");
-    ld_flags.push_back("-nostdlib");
     ld_flags.push_back("-nostdinc");
-    ld_flags.push_back("-nostdinc++");
-    ld_flags.push_back("-ffreestanding");
-    ld_flags.push_back("-nostartfiles");
-    ld_flags.push_back("-nodefaultlibs");
     ld_flags.push_back("-Wl,--build-id=none");
     ld_flags.push_back("-Wl,--gc-sections");
     ld_flags.push_back("-Wl,--strip-all");
     ld_flags.push_back("-Wl,--no-undefined");
-    ld_flags.push_back("-Wl,--entry=_start");
 
     if (!invoke_jcc_helper_ld(objpath, m_output_file, ld_flags, env_jcc_ld))
     {
@@ -874,6 +774,15 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Lexer::lex(" + std::string(e.what()) + ")");
         panic("Caught unexpected exception in Lexer::lex()", this->m_messages);
         return false;
+    }
+
+    // Prefix all identifiers with '_' to prevent name collisions with C++ keywords
+    for (auto &token : tokens.m_tokens)
+    {
+        if (token.type() == TokenType::Identifier)
+        {
+            std::get<std::string>(token.m_value) = "_" + std::get<std::string>(token.value());
+        }
     }
 
     std::shared_ptr<AbstractSyntaxTree> ast;
@@ -1157,23 +1066,23 @@ bool jcc::CompilationJob::success() const
 ///=============================================================================
 
 #if defined(__linux__)
-static void print_stacktrace()
+static void print_backtrace()
 {
-    std::cerr << "Stacktrace:" << std::endl;
-
-    void *array[128];
+    void *array[10];
     size_t size;
+    char **strings;
+    size_t i;
 
-    size = backtrace(array, 128);
+    size = backtrace(array, 10);
+    strings = backtrace_symbols(array, size);
 
-    char **strings = backtrace_symbols(array, size);
+    std::cerr << "== BEGIN BACKTRACE ==\n"
+              << std::endl;
 
-    for (size_t i = 0; i < size; i++)
-    {
-        std::cerr << "   \x1b[37;49m" << strings[i] << "\x1b[0m" << std::endl;
-    }
+    for (i = 0; i < size; i++)
+        std::cerr << strings[i] << std::endl;
 
-    std::cerr << std::endl;
+    std::cerr << "\n== END BACKTRACE ==" << std::endl;
 
     free(strings);
 }
@@ -1230,7 +1139,7 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
     std::cerr << "\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1m" << message << "\x1b[0m\n"
               << std::endl;
 
-    print_stacktrace();
+    print_backtrace();
 
     std::cerr
         << "\x1b[32;49mPlease report this error to the JCC developers\x1b[0m" << std::endl;
@@ -1240,5 +1149,7 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
               << "JCR0-" + base58_encode(jcc::crypto::sha256(autoreport_id.str())) << "\x1b[0m\n"
               << std::endl;
 
-    _exit(0);
+    /// TODO: fix
+    // _exit(0);
+    abort();
 }

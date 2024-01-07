@@ -186,6 +186,8 @@ namespace jcc
         /// @return Target language source code.
         std::string generate(const std::shared_ptr<AbstractSyntaxTree> &ast, TargetLanguage target = TargetLanguage::CXX);
 
+        static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx);
+
     private:
         std::vector<std::string> m_files;
         size_t m_current_file;
@@ -232,14 +234,115 @@ namespace jcc
         /// @note This function will populate the messages vector
         bool invoke_jcc_helper_ld(const std::string &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program);
 
-        bool parse_code(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-
         bool parse_block(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
 
-        /// @brief Parse struct
-        bool parse_struct_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+        bool parse_struct_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed = false);
+
+        enum class FunctionParseMode {
+            DeclarationOnly,
+            DefinitionOnly,
+            DeclarationOrDefinition,
+        };
+
+        bool parse_func_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, FunctionParseMode mode = FunctionParseMode::DeclarationOrDefinition);
 
         bool parse_namespace_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+
+        bool parse_return_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+
+        struct ExpNode
+        {
+            jcc::Token value;
+            std::vector<ExpNode> children;
+            ExpNode() = default;
+            ExpNode(const jcc::Token &value, const std::vector<ExpNode> &children) : value(value), children(children) {}
+
+            std::string print_tree(const ExpNode node, const std::string prefix, bool is_tail, std::string str) const
+            {
+                str += prefix + (is_tail ? "└── " : "├── ");
+                switch (node.value.type())
+                {
+                case jcc::TokenType::Identifier:
+                    str += std::get<std::string>(value.value());
+                    break;
+                case jcc::TokenType::Operator:
+                    str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
+                    break;
+                case jcc::TokenType::NumberLiteral:
+                    str += std::to_string(std::get<uint64_t>(value.value()));
+                    break;
+                case jcc::TokenType::StringLiteral:
+                    str += std::get<std::string>(value.value());
+                    break;
+                case jcc::TokenType::Keyword:
+                    str += lexKeywordMapReverse.at(std::get<jcc::Keyword>(value.value()));
+                    break;
+                case jcc::TokenType::Punctuator:
+                    str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
+                    break;
+                default:
+                    str += "Unknown";
+                    break;
+                }
+                str += "\n";
+                for (size_t i = 0; i < node.children.size(); i++)
+                {
+                    str = print_tree(node.children[i], prefix + (is_tail ? "    " : "│   "), i == node.children.size() - 1, str);
+                }
+                return str;
+            }
+
+            std::string to_string() const
+            {
+                // std::string str = "Node(";
+                // switch (value.type())
+                // {
+                // case jcc::TokenType::Identifier:
+                //     str += std::get<std::string>(value.value());
+                //     break;
+                // case jcc::TokenType::Operator:
+                //     str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
+                //     break;
+                // case jcc::TokenType::NumberLiteral:
+                //     str += std::to_string(std::get<uint64_t>(value.value()));
+                //     break;
+                // case jcc::TokenType::StringLiteral:
+                //     str += std::get<std::string>(value.value());
+                //     break;
+                // case jcc::TokenType::Keyword:
+                //     str += std::get<std::string>(value.value());
+                //     break;
+                // case jcc::TokenType::Punctuator:
+                //     str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
+                //     break;
+                // default:
+                //     break;
+                // }
+                // str += ", [";
+                // for (const auto &child : children)
+                // {
+                //     str += child.to_string() + ", ";
+                // }
+
+                // if (children.size() > 0)
+                // {
+                //     str.pop_back();
+                //     str.pop_back();
+                // }
+
+                // str += "])";
+
+                // return str;
+
+                return print_tree(*this, "", true, "");
+            }
+        };
+
+        std::vector<ExpNode> infix_to_postfix(jcc::TokenList &list);
+
+        bool parse_expression_helper(TokenList &tokens, ExpNode &output);
+
+        bool parse_expression(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     };
 
     class CompilationJob

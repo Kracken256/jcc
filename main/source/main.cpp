@@ -238,51 +238,52 @@ int main(int argc, char **argv)
 
     CompilationJob job;
 
+    auto unit = std::make_unique<CompilationUnit>();
+    unit->set_output_file(mode.output_file);
+
     for (auto file : mode.input_files)
     {
-        auto unit = std::make_unique<CompilationUnit>();
-        unit->set_output_file(mode.output_file);
         unit->add_file(file);
-
-        for (auto flag : mode.flags)
-        {
-            switch (flag)
-            {
-            case JccModeFlags::Verbose:
-                unit->add_flag(CompileFlag::Verbose);
-                break;
-            case JccModeFlags::Debug:
-                unit->add_flag(CompileFlag::Debug);
-                break;
-            case JccModeFlags::OptimizeNone:
-                unit->add_flag(CompileFlag::OptimizeNone);
-                break;
-            case JccModeFlags::OptimizeLight:
-                unit->add_flag(CompileFlag::OptimizeLight);
-                break;
-            case JccModeFlags::OptimizeSpeed:
-                unit->add_flag(CompileFlag::OptimizeSpeed);
-                break;
-            case JccModeFlags::OptimizeAggressive:
-                unit->add_flag(CompileFlag::OptimizeAggressive);
-                break;
-            case JccModeFlags::OptimizeSize:
-                unit->add_flag(CompileFlag::OptimizeSize);
-                break;
-            case JccModeFlags::Object:
-                unit->add_flag(CompileFlag::Object);
-                break;
-            case JccModeFlags::TranslateOnly:
-                unit->add_flag(CompileFlag::TranslateOnly);
-                break;
-
-            default:
-                break;
-            }
-        }
-        job.set_output_file(mode.output_file);
-        job.add_unit(file, std::move(unit));
     }
+    for (auto flag : mode.flags)
+    {
+        switch (flag)
+        {
+        case JccModeFlags::Verbose:
+            unit->add_flag(CompileFlag::Verbose);
+            break;
+        case JccModeFlags::Debug:
+            unit->add_flag(CompileFlag::Debug);
+            break;
+        case JccModeFlags::OptimizeNone:
+            unit->add_flag(CompileFlag::OptimizeNone);
+            break;
+        case JccModeFlags::OptimizeLight:
+            unit->add_flag(CompileFlag::OptimizeLight);
+            break;
+        case JccModeFlags::OptimizeSpeed:
+            unit->add_flag(CompileFlag::OptimizeSpeed);
+            break;
+        case JccModeFlags::OptimizeAggressive:
+            unit->add_flag(CompileFlag::OptimizeAggressive);
+            break;
+        case JccModeFlags::OptimizeSize:
+            unit->add_flag(CompileFlag::OptimizeSize);
+            break;
+        case JccModeFlags::Object:
+            unit->add_flag(CompileFlag::Object);
+            break;
+        case JccModeFlags::TranslateOnly:
+            unit->add_flag(CompileFlag::TranslateOnly);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    job.set_output_file(mode.output_file);
+    job.add_unit(mode.output_file, std::move(unit));
 
     job.run_job();
 

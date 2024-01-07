@@ -44,7 +44,9 @@ namespace jcc
 
         NamespaceDefinition,
         StructField,
+        StructAttribute,
         StructDefinition,
+        FunctionDefinition,
 
         ///===================
         /// Expressions
@@ -52,12 +54,18 @@ namespace jcc
         BinaryExpression,
         UnaryExpression,
         CastExpression,
+        LiteralExpression,
         CallExpression,
-        LambdaExpression,
+        StringLiteralExpression,
+        CharLiteralExpression,
+        IntegerLiteralExpression,
+        FloatingPointLiteralExpression,
+        BooleanLiteralExpression,
 
         ///===================
         /// Statements
         ///===================
+        ReturnStatement,
     };
 
     enum class VisiblityModifier
@@ -358,11 +366,32 @@ namespace jcc
         std::shared_ptr<Block> m_block;
     };
 
+    class StructAttribute : public GenericNode
+    {
+    public:
+        StructAttribute(NodeType type = NodeType::StructAttribute) : GenericNode(type) {}
+        StructAttribute(const std::string &name, const std::string &value) : GenericNode(NodeType::StructAttribute), m_name(name), m_value(value) {}
+        virtual ~StructAttribute() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::string &value() const { return m_value; }
+        std::string &value() { return m_value; }
+
+        std::string to_string() const override { return "StructAttribute(" + m_name + ", " + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"struct_attribute\",\"name\":\"" + json_escape(m_name) + "\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+
+    protected:
+        std::string m_name;
+        std::string m_value;
+    };
+
     class StructField : public GenericNode
     {
     public:
-        StructField(NodeType type = NodeType::StructField) : GenericNode(type), m_bitfield(0) {}
-        StructField(const std::string &name, const std::string &type, uint64_t bitfield, const std::string &default_value) : GenericNode(NodeType::StructField), m_name(name), m_type(type), m_bitfield(bitfield), m_default_value(default_value) {}
+        StructField(NodeType type = NodeType::StructField) : GenericNode(type), m_bitfield(0), m_arr_size(0) {}
+        StructField(const std::string &name, const std::string &type, uint64_t bitfield, const std::string &default_value, size_t arr_size = 0, const std::vector<std::shared_ptr<StructAttribute>> &attributes = {}) : GenericNode(NodeType::StructField), m_name(name), m_type(type), m_bitfield(bitfield), m_default_value(default_value), m_arr_size(arr_size), m_attributes(attributes) {}
         virtual ~StructField() {}
 
         const std::string &name() const { return m_name; }
@@ -377,21 +406,29 @@ namespace jcc
         const uint64_t &bitfield() const { return m_bitfield; }
         uint64_t &bitfield() { return m_bitfield; }
 
+        const size_t &arr_size() const { return m_arr_size; }
+        size_t &arr_size() { return m_arr_size; }
+
+        const std::vector<std::shared_ptr<StructAttribute>> &attributes() const { return m_attributes; }
+        std::vector<std::shared_ptr<StructAttribute>> &attributes() { return m_attributes; }
+
         std::string to_string() const override { return "StructField(" + m_name + ", " + m_type + ")"; }
-        std::string to_json() const override { return "{\"type\":\"struct_field\",\"name\":\"" + json_escape(m_name) + "\",\"type\":\"" + json_escape(m_type) + "\",\"default_value\":\"" + json_escape(m_default_value) + "\"}"; }
+        std::string to_json() const override;
 
     protected:
         std::string m_name;
         std::string m_type;
         uint64_t m_bitfield;
         std::string m_default_value;
+        size_t m_arr_size;
+        std::vector<std::shared_ptr<StructAttribute>> m_attributes;
     };
 
     class StructDefinition : public Definition
     {
     public:
         StructDefinition(NodeType type = NodeType::StructDefinition) : Definition(type) {}
-        StructDefinition(const std::string &name, std::vector<std::shared_ptr<StructField>> fields) : Definition(NodeType::StructDefinition), m_name(name), m_fields(fields) {}
+        StructDefinition(const std::string &name, std::vector<std::shared_ptr<StructField>> fields, bool packed = false) : Definition(NodeType::StructDefinition), m_name(name), m_fields(fields), m_packed(packed) {}
         virtual ~StructDefinition() {}
 
         const std::string &name() const { return m_name; }
@@ -400,12 +437,230 @@ namespace jcc
         const std::vector<std::shared_ptr<StructField>> &fields() const { return m_fields; }
         std::vector<std::shared_ptr<StructField>> &fields() { return m_fields; }
 
+        const bool &packed() const { return m_packed; }
+        bool &packed() { return m_packed; }
+
         std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
         std::string m_name;
         std::vector<std::shared_ptr<StructField>> m_fields;
+        bool m_packed;
+    };
+
+    class FunctionDefinition : public Definition
+    {
+    public:
+        FunctionDefinition(NodeType type = NodeType::FunctionDefinition) : Definition(type) {}
+        FunctionDefinition(const std::string &name, const std::string &return_type, std::vector<std::shared_ptr<FunctionParameter>> parameters, std::shared_ptr<Block> block) : Definition(NodeType::FunctionDefinition), m_return_type(return_type), m_parameters(parameters), m_name(name), m_block(block) {}
+        virtual ~FunctionDefinition() {}
+
+        const std::string &return_type() const { return m_return_type; }
+        std::string &return_type() { return m_return_type; }
+
+        const std::vector<std::shared_ptr<FunctionParameter>> &parameters() const { return m_parameters; }
+        std::vector<std::shared_ptr<FunctionParameter>> &parameters() { return m_parameters; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::shared_ptr<Block> &block() const { return m_block; }
+        std::shared_ptr<Block> &block() { return m_block; }
+
+        std::string to_string() const override;
+        std::string to_json() const override;
+
+    protected:
+        std::string m_return_type;
+        std::vector<std::shared_ptr<FunctionParameter>> m_parameters;
+        std::string m_name;
+        std::shared_ptr<Block> m_block;
+    };
+
+    ///=================================================================================================
+    /// Expressions types
+    ///=================================================================================================
+
+    class BinaryExpression : public Expression
+    {
+    public:
+        BinaryExpression(NodeType type = NodeType::BinaryExpression) : Expression(type) {}
+        BinaryExpression(const std::string &op, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right) : Expression(NodeType::BinaryExpression), m_op(op), m_left(left), m_right(right) {}
+        virtual ~BinaryExpression() {}
+
+        const std::string &op() const { return m_op; }
+        std::string &op() { return m_op; }
+
+        const std::shared_ptr<Expression> &left() const { return m_left; }
+        std::shared_ptr<Expression> &left() { return m_left; }
+
+        const std::shared_ptr<Expression> &right() const { return m_right; }
+        std::shared_ptr<Expression> &right() { return m_right; }
+
+        std::string to_string() const override { return "BinaryExpression(" + m_op + ", " + m_left->to_string() + ", " + m_right->to_string() + ")"; }
+        std::string to_json() const override { return "{\"type\":\"binary_expression\",\"op\":\"" + json_escape(m_op) + "\",\"left\":" + m_left->to_json() + ",\"right\":" + m_right->to_json() + "}"; }
+
+    protected:
+        std::string m_op;
+        std::shared_ptr<Expression> m_left;
+        std::shared_ptr<Expression> m_right;
+    };
+
+    class UnaryExpression : public Expression
+    {
+    public:
+        UnaryExpression(NodeType type = NodeType::UnaryExpression) : Expression(type) {}
+        UnaryExpression(const std::string &op, std::shared_ptr<Expression> expression) : Expression(NodeType::UnaryExpression), m_op(op), m_expression(expression) {}
+        virtual ~UnaryExpression() {}
+
+        const std::string &op() const { return m_op; }
+        std::string &op() { return m_op; }
+
+        const std::shared_ptr<Expression> &expression() const { return m_expression; }
+        std::shared_ptr<Expression> &expression() { return m_expression; }
+
+        std::string to_string() const override { return "UnaryExpression(" + m_op + ", " + m_expression->to_string() + ")"; }
+        std::string to_json() const override { return "{\"type\":\"unary_expression\",\"op\":\"" + json_escape(m_op) + "\",\"expression\":" + m_expression->to_json() + "}"; }
+
+    protected:
+        std::string m_op;
+        std::shared_ptr<Expression> m_expression;
+    };
+
+    class CastExpression : public Expression
+    {
+    public:
+        CastExpression(NodeType type = NodeType::CastExpression) : Expression(type) {}
+        CastExpression(const std::string &type, std::shared_ptr<Expression> expression) : Expression(NodeType::CastExpression), m_type(type), m_expression(expression) {}
+        virtual ~CastExpression() {}
+
+        const std::string &type() const { return m_type; }
+        std::string &type() { return m_type; }
+
+        const std::shared_ptr<Expression> &expression() const { return m_expression; }
+        std::shared_ptr<Expression> &expression() { return m_expression; }
+
+        std::string to_string() const override { return "CastExpression(" + m_type + ", " + m_expression->to_string() + ")"; }
+        std::string to_json() const override { return "{\"type\":\"cast_expression\",\"type\":\"" + json_escape(m_type) + "\",\"expression\":" + m_expression->to_json() + "}"; }
+
+    protected:
+        std::string m_type;
+        std::shared_ptr<Expression> m_expression;
+    };
+
+    class CallExpression : public Expression
+    {
+    public:
+        CallExpression(NodeType type = NodeType::CallExpression) : Expression(type) {}
+        CallExpression(const std::string &name, std::vector<std::shared_ptr<Expression>> arguments) : Expression(NodeType::CallExpression), m_name(name), m_arguments(arguments) {}
+        virtual ~CallExpression() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::vector<std::shared_ptr<Expression>> &arguments() const { return m_arguments; }
+        std::vector<std::shared_ptr<Expression>> &arguments() { return m_arguments; }
+
+        std::string to_string() const override;
+        std::string to_json() const override;
+
+    protected:
+        std::string m_name;
+        std::vector<std::shared_ptr<Expression>> m_arguments;
+    };
+
+    class LiteralExpression : public Expression
+    {
+    public:
+        LiteralExpression(NodeType type = NodeType::LiteralExpression) : Expression(type) {}
+        LiteralExpression(const std::string &value, NodeType type = NodeType::LiteralExpression) : Expression(type), m_value(value) {}
+        virtual ~LiteralExpression() {}
+
+        const std::string &value() const { return m_value; }
+        std::string &value() { return m_value; }
+
+        std::string to_string() const override { return "LiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+
+    protected:
+        std::string m_value;
+    };
+
+    class StringLiteralExpression : public LiteralExpression
+    {
+    public:
+        StringLiteralExpression(NodeType type = NodeType::StringLiteralExpression) : LiteralExpression(type) {}
+        StringLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::StringLiteralExpression) {}
+        virtual ~StringLiteralExpression() {}
+
+        std::string to_string() const override { return "StringLiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"string_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+    };
+
+    class CharLiteralExpression : public LiteralExpression
+    {
+    public:
+        CharLiteralExpression(NodeType type = NodeType::CharLiteralExpression) : LiteralExpression(type) {}
+        CharLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::CharLiteralExpression) {}
+        virtual ~CharLiteralExpression() {}
+
+        std::string to_string() const override { return "CharLiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"char_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+    };
+
+    class IntegerLiteralExpression : public LiteralExpression
+    {
+    public:
+        IntegerLiteralExpression(NodeType type = NodeType::IntegerLiteralExpression) : LiteralExpression(type) {}
+        IntegerLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::IntegerLiteralExpression) {}
+        virtual ~IntegerLiteralExpression() {}
+
+        std::string to_string() const override { return "IntegerLiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"integer_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+    };
+
+    class FloatingPointLiteralExpression : public LiteralExpression
+    {
+    public:
+        FloatingPointLiteralExpression(NodeType type = NodeType::FloatingPointLiteralExpression) : LiteralExpression(type) {}
+        FloatingPointLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::FloatingPointLiteralExpression) {}
+        virtual ~FloatingPointLiteralExpression() {}
+
+        std::string to_string() const override { return "FloatingPointLiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"float_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+    };
+
+    class BooleanLiteralExpression : public LiteralExpression
+    {
+    public:
+        BooleanLiteralExpression(NodeType type = NodeType::BooleanLiteralExpression) : LiteralExpression(type) {}
+        BooleanLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::BooleanLiteralExpression) {}
+        virtual ~BooleanLiteralExpression() {}
+
+        std::string to_string() const override { return "BooleanLiteralExpression(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"boolean_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+    };
+
+    ///=================================================================================================
+    /// Statements types
+    ///=================================================================================================
+
+    class ReturnStatement : public Statement
+    {
+    public:
+        ReturnStatement(NodeType type = NodeType::ReturnStatement) : Statement(type) {}
+        ReturnStatement(std::shared_ptr<Expression> expression) : Statement(NodeType::ReturnStatement), m_expression(expression) {}
+        virtual ~ReturnStatement() {}
+
+        const std::shared_ptr<Expression> &expression() const { return m_expression; }
+        std::shared_ptr<Expression> &expression() { return m_expression; }
+
+        std::string to_string() const override { return "ReturnStatement()"; }
+        std::string to_json() const override { return "{\"type\":\"return_statement\"}"; }
+
+    protected:
+        std::shared_ptr<Expression> m_expression;
     };
 }
 

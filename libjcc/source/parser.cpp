@@ -18,6 +18,11 @@ static bool is_builtin_type(const std::string &type)
         return true;
     }
 
+    if (type == "void" || type == "null")
+    {
+        return true;
+    }
+
     // complex types
     if (type == "address" || type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "buffer" || type == "secbuffer" || type == "secstring" || type == "map" || type == "tensor" || type == "routine")
     {
@@ -247,6 +252,28 @@ std::string jcc::NamespaceDefinition::to_json() const
 }
 
 ///=============================================================================
+/// StructField
+///=============================================================================
+
+std::string jcc::StructField::to_json() const
+{
+    std::string str = "{\"type\":\"struct_field\",\"name\":\"" + json_escape(m_name) + "\",\"type\":\"" + json_escape(m_type) + "\",\"default_value\":\"" + json_escape(m_default_value) + "\",\"bitfield\":" + std::to_string(m_bitfield) + ",\"arr_size\":" + std::to_string(m_arr_size) + ",\"attributes\":[";
+    for (auto &attribute : m_attributes)
+    {
+        str += attribute->to_json();
+
+        if (attribute != m_attributes.back())
+        {
+            str += ",";
+        }
+    }
+
+    str += "]}";
+
+    return str;
+}
+
+///=============================================================================
 /// StructDefinition
 ///=============================================================================
 
@@ -277,6 +304,80 @@ std::string jcc::StructDefinition::to_json() const
         str += child->to_json() + ",";
     }
     if (m_fields.size() > 0)
+    {
+        str.pop_back();
+    }
+    str += "]}";
+    return str;
+}
+
+///=============================================================================
+/// FunctionDefinition
+///=============================================================================
+
+std::string jcc::FunctionDefinition::to_string() const
+{
+    std::string str = "FunctionDefinition(" + m_name + ", " + m_return_type + ", [";
+    for (auto &parameter : m_parameters)
+    {
+        str += parameter->to_string() + ", ";
+    }
+
+    if (m_parameters.size() > 0)
+    {
+        str.pop_back();
+        str.pop_back();
+    }
+
+    str += "], {" + m_block->to_string() + "})";
+    return str;
+}
+
+std::string jcc::FunctionDefinition::to_json() const
+{
+    std::string str = "{\"type\":\"function_definition\",\"name\":\"" + json_escape(m_name) + "\",\"return_type\":\"" + json_escape(m_return_type) + "\",\"parameters\":[";
+    for (auto &parameter : m_parameters)
+    {
+        str += parameter->to_json() + ",";
+    }
+    if (m_parameters.size() > 0)
+    {
+        str.pop_back();
+    }
+    str += "],\"block\":" + m_block->to_json() + "}";
+    return str;
+}
+
+///=============================================================================
+/// CallExpression
+///=============================================================================
+
+std::string jcc::CallExpression::to_string() const
+{
+    std::string str = "CallExpression(" + m_name + ", [";
+    for (auto &child : m_arguments)
+    {
+        str += child->to_string() + ", ";
+    }
+
+    if (m_arguments.size() > 0)
+    {
+        str.pop_back();
+        str.pop_back();
+    }
+
+    str += "])";
+    return str;
+}
+
+std::string jcc::CallExpression::to_json() const
+{
+    std::string str = "{\"type\":\"call_expression\",\"name\":\"" + json_escape(m_name) + "\",\"arguments\":[";
+    for (auto &child : m_arguments)
+    {
+        str += child->to_json() + ",";
+    }
+    if (m_arguments.size() > 0)
     {
         str.pop_back();
     }
@@ -322,8 +423,13 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
         case TokenType::Keyword:
             switch (std::get<jcc::Keyword>(curtok.value()))
             {
+            case Keyword::Region:
+                if (!parse_struct_keyword(tokens, tmp, true))
+                    return false;
+                block->push(tmp);
+                break;
             case Keyword::Struct:
-                if (!parse_struct_keyword(tokens, tmp))
+                if (!parse_struct_keyword(tokens, tmp, false))
                     return false;
                 block->push(tmp);
                 break;
@@ -332,14 +438,59 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
                     return false;
                 block->push(tmp);
                 break;
+            case Keyword::Func:
+                if (!parse_func_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Return:
+                if (!parse_return_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
             default:
                 throw SyntaxError("Unknown keyword: " + std::to_string((int)std::get<jcc::Keyword>(curtok.value())));
             }
             break;
         case TokenType::Punctuator:
-            if (std::get<Punctuator>(curtok.value()) == Punctuator::CloseBrace)
+            switch (std::get<Punctuator>(curtok.value()))
             {
+            case Punctuator::OpenBrace:
+                throw SyntaxError("Unexpected opening brace");
+                break;
+            case Punctuator::CloseBrace:
                 is_looping = false;
+                break;
+            case Punctuator::OpenParen:
+                throw SyntaxError("Unexpected opening parenthesis");
+                break;
+            case Punctuator::CloseParen:
+                throw SyntaxError("Unexpected closing parenthesis");
+                break;
+            case Punctuator::OpenBracket:
+                throw SyntaxError("Unexpected opening bracket");
+                break;
+            case Punctuator::CloseBracket:
+                throw SyntaxError("Unexpected closing bracket");
+                break;
+            case Punctuator::Semicolon:
+                // ignore semicolons
+                tokens.pop();
+                break;
+            case Punctuator::Colon:
+                throw SyntaxError("Unexpected colon");
+                break;
+            case Punctuator::Comma:
+                throw SyntaxError("Unexpected comma");
+                break;
+            case Punctuator::Period:
+                throw SyntaxError("Unexpected period");
+                break;
+            case Punctuator::ScopeResolution:
+                throw SyntaxError("Unexpected scope resolution");
+                break;
+
+            default:
                 break;
             }
             break;
@@ -357,6 +508,12 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
         }
     }
 
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected closing brace for block");
+        return false;
+    }
+
     Token next_2 = tokens.peek(0);
 
     if (next_2.type() != TokenType::Punctuator || std::get<Punctuator>(next_2.value()) != Punctuator::CloseBrace)
@@ -372,7 +529,15 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
     return true;
 }
 
-bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+void h(int x)
+{
+    if (x == 0)
+        return;
+
+    h(x--);
+}
+
+bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
 {
     if (tokens.size() < 3)
     {
@@ -424,10 +589,11 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
     // should be identifier
     std::vector<std::shared_ptr<StructField>> fields;
 
+    std::shared_ptr<StructField> field = std::make_shared<StructField>();
+
     while (1)
     {
         Token curtok = tokens.peek();
-        std::shared_ptr<StructField> field = std::make_shared<StructField>();
 
         if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBrace)
         {
@@ -435,141 +601,303 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
             break;
         }
 
-        // name
-        if (curtok.type() != TokenType::Identifier)
-        {
-            throw SyntaxError("Expected identifier in struct field");
-            return false;
-        }
-        field->name() = std::get<std::string>(curtok.value());
-        tokens.pop();
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected seperator in struct field");
-            return false;
-        }
-
-        curtok = tokens.peek();
-        if (curtok.type() != TokenType::Punctuator && std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
-        {
-            throw SyntaxError("Expected seperator in struct field");
-            return false;
-        }
-        tokens.pop();
-
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected type in struct field");
-            return false;
-        }
-
-        // type
-        curtok = tokens.peek();
-        if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
-        {
-            throw SyntaxError("Expected type in struct field");
-            return false;
-        }
-
-        switch (curtok.type())
-        {
-        case TokenType::Identifier:
-            field->type() = std::get<std::string>(curtok.value());
-            break;
-        case TokenType::Keyword:
-            // check if
-            if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
-            {
-                field->type() = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
-            }
-            else
-            {
-                throw SyntaxError("Expected type in struct field");
-                return false;
-            }
-
-        default:
-            break;
-        }
-
-        tokens.pop();
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected seperator in struct field");
-            return false;
-        }
-
-        curtok = tokens.peek();
-
-        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+        if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::At)
         {
             tokens.pop();
-
             if (tokens.eof())
             {
-                throw SyntaxError("Expected bitfield in struct field");
+                throw SyntaxError("Expected attribute in struct field");
                 return false;
             }
 
             curtok = tokens.peek();
-
-            if (curtok.type() != TokenType::NumberLiteral)
+            if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
             {
-                throw SyntaxError("Expected bitfield in struct field");
+                throw SyntaxError("Expected attribute in struct field");
                 return false;
             }
-
-            field->bitfield() = std::get<uint64_t>(curtok.value());
             tokens.pop();
-        }
-
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected seperator in struct field");
-            return false;
-        }
-
-        curtok = tokens.peek();
-        if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
-        {
-            tokens.pop();
-
             if (tokens.eof())
             {
-                throw SyntaxError("Expected default value in struct field");
+                throw SyntaxError("Expected attribute name in struct field");
                 return false;
             }
 
             curtok = tokens.peek();
-
-            if (curtok.type() != TokenType::StringLiteral && curtok.type() != TokenType::NumberLiteral && curtok.type() != TokenType::FloatingPointLiteral)
+            if (curtok.type() != TokenType::Identifier)
             {
-                throw SyntaxError("Expected default value in struct field");
+                throw SyntaxError("Expected attribute name in struct field");
+                return false;
+            }
+            tokens.pop();
+
+            std::shared_ptr<StructAttribute> attribute = std::make_shared<StructAttribute>();
+            attribute->name() = std::get<std::string>(curtok.value());
+
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected attribute value in struct field");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenParen)
+            {
+                throw SyntaxError("Expected attribute value in struct field");
+                return false;
+            }
+            tokens.pop();
+
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected attribute value in struct field");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::StringLiteral && curtok.type() != TokenType::NumberLiteral)
+            {
+                throw SyntaxError("Expected attribute value in struct field");
                 return false;
             }
 
             switch (curtok.type())
             {
             case TokenType::StringLiteral:
-                field->default_value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
+                attribute->value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
                 break;
             case TokenType::NumberLiteral:
-                field->default_value() = std::to_string(std::get<uint64_t>(curtok.value()));
+                attribute->value() = std::to_string(std::get<uint64_t>(curtok.value()));
                 break;
-            case TokenType::FloatingPointLiteral:
-                field->default_value() = std::to_string(std::get<double>(curtok.value()));
+            default:
                 break;
+            }
+
+            tokens.pop();
+
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected attribute value in struct field");
+                return false;
+            }
+
+            curtok = tokens.peek();
+
+            if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::CloseParen)
+            {
+                throw SyntaxError("Expected attribute value in struct field");
+                return false;
+            }
+
+            tokens.pop();
+
+            field->attributes().push_back(attribute);
+        }
+        else
+        {
+
+            // name
+            if (curtok.type() != TokenType::Identifier)
+            {
+                throw SyntaxError("Expected identifier in struct field");
+                return false;
+            }
+            field->name() = std::get<std::string>(curtok.value());
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected seperator in struct field");
+                return false;
+            }
+
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::Punctuator && std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+            {
+                throw SyntaxError("Expected seperator in struct field");
+                return false;
+            }
+            tokens.pop();
+
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected type in struct field");
+                return false;
+            }
+
+            // type
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+            {
+                throw SyntaxError("Expected type in struct field");
+                return false;
+            }
+
+            switch (curtok.type())
+            {
+            case TokenType::Identifier:
+                field->type() = std::get<std::string>(curtok.value());
+                break;
+            case TokenType::Keyword:
+                // check if
+                if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
+                {
+                    field->type() = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+                }
+                else
+                {
+                    throw SyntaxError("Expected type in struct field");
+                    return false;
+                }
 
             default:
                 break;
             }
             tokens.pop();
-        }
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected seperator in struct field");
+                return false;
+            }
 
-        fields.push_back(field);
+            curtok = tokens.peek();
+
+            if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
+            {
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected number in array size");
+                    return false;
+                }
+
+                tokens.pop();
+
+                curtok = tokens.peek();
+
+                if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBracket)
+                {
+                    field->arr_size() = std::numeric_limits<uint64_t>::max();
+                    goto skip_array_size;
+                }
+
+                if (curtok.type() != TokenType::NumberLiteral)
+                {
+                    throw SyntaxError("Expected number in array size");
+                    return false;
+                }
+
+                field->arr_size() = std::get<uint64_t>(curtok.value());
+                tokens.pop();
+
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected closing bracket in array size");
+                    return false;
+                }
+
+                curtok = tokens.peek();
+
+                if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::CloseBracket)
+                {
+                    throw SyntaxError("Expected closing bracket in array size");
+                    return false;
+                }
+
+            skip_array_size:
+
+                tokens.pop();
+
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected seperator in struct field");
+                    return false;
+                }
+
+                curtok = tokens.peek();
+            }
+
+            if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+            {
+                tokens.pop();
+
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected bitfield in struct field");
+                    return false;
+                }
+
+                curtok = tokens.peek();
+
+                if (curtok.type() != TokenType::NumberLiteral)
+                {
+                    throw SyntaxError("Expected bitfield in struct field");
+                    return false;
+                }
+
+                field->bitfield() = std::get<uint64_t>(curtok.value());
+                tokens.pop();
+            }
+
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected seperator in struct field");
+                return false;
+            }
+
+            curtok = tokens.peek();
+            if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
+            {
+                tokens.pop();
+
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected default value in struct field");
+                    return false;
+                }
+
+                curtok = tokens.peek();
+
+                if (curtok.type() != TokenType::StringLiteral && curtok.type() != TokenType::NumberLiteral && curtok.type() != TokenType::FloatingPointLiteral && curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+                {
+                    throw SyntaxError("Expected default value in struct field");
+                    return false;
+                }
+
+                switch (curtok.type())
+                {
+                case TokenType::StringLiteral:
+                    field->default_value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
+                    break;
+                case TokenType::NumberLiteral:
+                    field->default_value() = std::to_string(std::get<uint64_t>(curtok.value()));
+                    break;
+                case TokenType::FloatingPointLiteral:
+                    field->default_value() = std::to_string(std::get<double>(curtok.value()));
+                    break;
+                case TokenType::Identifier:
+                    field->default_value() = std::get<std::string>(curtok.value());
+                    break;
+                case TokenType::Keyword:
+                    if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
+                    {
+                        field->default_value() = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+                    }
+                    else
+                    {
+                        throw SyntaxError("Expected default value in struct field");
+                        return false;
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+                tokens.pop();
+            }
+
+            fields.push_back(field);
+            field = std::make_shared<StructField>();
+        }
     }
 
-    node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields);
+    node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields, packed);
 
     if (fields.empty())
     {
@@ -629,50 +957,333 @@ bool jcc::CompilationUnit::parse_namespace_keyword(jcc::TokenList &tokens, std::
     return true;
 }
 
-bool jcc::CompilationUnit::parse_code(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::CompilationUnit::FunctionParseMode mode)
 {
-    while (!tokens.eof())
+    // func name ([[name:type[=default]]...]) [-> return_type] [block]
+
+    if (tokens.size() < 4)
+    {
+        throw SyntaxError("Expected identifier after func keyword");
+        return false;
+    }
+
+    Token next_1 = tokens.peek(1);
+    Token next_2 = tokens.peek(2);
+
+    if (next_1.type() != TokenType::Identifier)
+    {
+        throw SyntaxError("Expected identifier after func keyword");
+        return false;
+    }
+
+    if (next_2.type() != TokenType::Punctuator || std::get<Punctuator>(next_2.value()) != Punctuator::OpenParen)
+    {
+        throw SyntaxError("Expected opening parenthesis after func identifier");
+        return false;
+    }
+
+    // parse parameters
+    std::vector<std::shared_ptr<FunctionParameter>> parameters;
+
+    tokens.pop(3);
+
+    bool is_looping = true;
+    while (is_looping)
     {
         Token curtok = tokens.peek();
+
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseParen)
+        {
+            tokens.pop();
+            is_looping = false;
+            break;
+        }
+
+        if (curtok.type() != TokenType::Identifier)
+        {
+            throw SyntaxError("Expected identifier in function parameter");
+            return false;
+        }
+
+        std::shared_ptr<FunctionParameter> parameter = std::make_shared<FunctionParameter>();
+        parameter->name() = std::get<std::string>(curtok.value());
+
+        tokens.pop();
+
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected seperator in function parameter");
+            return false;
+        }
+
+        curtok = tokens.peek();
+
+        if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+        {
+            throw SyntaxError("Expected seperator in function parameter");
+            return false;
+        }
+
+        tokens.pop();
+
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected type in function parameter");
+            return false;
+        }
+
+        curtok = tokens.peek();
+
+        if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+        {
+            throw SyntaxError("Expected type in function parameter type");
+            return false;
+        }
 
         switch (curtok.type())
         {
         case TokenType::Identifier:
-            break; // implement this
-        case TokenType::Keyword:
-            switch (std::get<jcc::Keyword>(curtok.value()))
-            {
-            case Keyword::Struct:
-                if (!parse_struct_keyword(tokens, node))
-                    return false;
-                break;
-            case Keyword::Namespace:
-                if (!parse_namespace_keyword(tokens, node))
-                    return false;
-                break;
-            default:
-                throw SyntaxError("Unknown keyword: " + std::to_string((int)std::get<jcc::Keyword>(curtok.value())));
-                break;
-            }
+            parameter->type() = std::get<std::string>(curtok.value());
             break;
-        case TokenType::NumberLiteral:
-            break; // implement this
-        case TokenType::FloatingPointLiteral:
-            break; // implement this
-        case TokenType::StringLiteral:
-            break; // implement this
-        case TokenType::Operator:
-            break; // implement this
-        case TokenType::Punctuator:
-            break; // implement this
-        case TokenType::Unknown:
-            panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
+        case TokenType::Keyword:
+            // check if
+            if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
+            {
+                parameter->type() = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+            }
+            else
+            {
+                throw SyntaxError("Expected type in function parameter type");
+                return false;
+            }
             break;
         default:
             panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
             break;
         }
+
+        tokens.pop();
+
+        parameters.push_back(parameter);
+
+        if (tokens.eof())
+        {
+            break;
+        }
+
+        curtok = tokens.peek();
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Comma)
+        {
+            tokens.pop();
+        }
     }
+
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected seperator in function declaration");
+        return false;
+    }
+
+    Token curtok = tokens.peek();
+    std::string return_type;
+
+    if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+    {
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected colon in function declaration");
+            return false;
+        }
+        curtok = tokens.peek();
+
+        // parse return type
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected return type in function declaration");
+            return false;
+        }
+        curtok = tokens.peek();
+
+        if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+        {
+            throw SyntaxError("Expected return type in function declaration");
+            return false;
+        }
+
+        if (curtok.type() == TokenType::Identifier)
+        {
+            return_type = std::get<std::string>(curtok.value());
+        }
+        else if (curtok.type() == TokenType::Keyword)
+        {
+            if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
+            {
+                return_type = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+                if (return_type == "null")
+                {
+                    return_type = "";
+                }
+            }
+            else
+            {
+                throw SyntaxError("Expected return type in function declaration");
+                return false;
+            }
+        }
+
+        tokens.pop();
+    }
+    else if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenBrace)
+    {
+        return_type = "void"; // implicit void return type
+        std::shared_ptr<FunctionDeclaration> func_ptr = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters);
+        node = func_ptr;
+
+        return true;
+    }
+    else
+    {
+        return_type = "void"; // implicit void return type
+    }
+
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected opening brace in function declaration");
+        return false;
+    }
+
+    curtok = tokens.peek();
+
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenBrace)
+    {
+        if (mode != FunctionParseMode::DeclarationOnly && mode != FunctionParseMode::DeclarationOrDefinition)
+        {
+            throw SyntaxError("Function definition expected but only declaration found");
+            return false;
+        }
+
+        node = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters);
+    }
+    else
+    {   
+        if (mode != FunctionParseMode::DefinitionOnly && mode != FunctionParseMode::DeclarationOrDefinition)
+        {
+            throw SyntaxError("Function declaration expected but definition found");
+            return false;
+        }
+        std::shared_ptr<GenericNode> block = std::make_shared<Block>();
+
+        if (!parse_block(tokens, block))
+        {
+            return false;
+        }
+
+        node = std::make_shared<FunctionDefinition>(std::get<std::string>(next_1.value()), return_type, parameters, std::static_pointer_cast<Block>(block));
+    }
+
+    return true;
+}
+
+bool jcc::CompilationUnit::parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    if (tokens.size() < 1)
+    {
+        throw SyntaxError("Expected return value after return keyword");
+        return false;
+    }
+
+    tokens.pop();
+
+    if (tokens.eof())
+    {
+        node = std::make_shared<ReturnStatement>(nullptr);
+        return true;
+    }
+
+    std::shared_ptr<GenericNode> expr;
+    if (!parse_expression(tokens, expr))
+    {
+        node = std::make_shared<ReturnStatement>(nullptr);
+    }
+    else
+    {
+        node = std::make_shared<ReturnStatement>(std::static_pointer_cast<Expression>(expr));
+    }
+
+    return true;
+}
+
+std::map<std::string, uint32_t> operator_precedence = {
+    {"++", 13},
+    {"--", 13},
+    {"+=", 13},
+    {"-=", 13},
+    {"*=", 13},
+    {"/=", 13},
+    {"%=", 13},
+    {"^^=", 13},
+    {"||=", 13},
+    {"&&=", 13},
+    {"<<=", 13},
+    {">>=", 13},
+    {">>>=", 13},
+    {"|=", 13},
+    {"&=", 13},
+    {"^=", 13},
+    {"<<", 12},
+    {">>", 12},
+    {"==", 11},
+    {"!=", 11},
+    {"&&", 10},
+    {"||", 9},
+    {"^^", 8},
+    {"<=", 7},
+    {">=", 7},
+    {"<", 7},
+    {">", 7},
+    {"=", 6},
+    {"??", 5},
+    {"@", 5},
+    {"//", 4},
+    {"+", 3},
+    {"-", 3},
+    {"*", 3},
+    {"/", 3},
+    {"%", 3},
+    {"&", 2},
+    {"|", 2},
+    {"^", 2},
+    {"~", 2},
+    {"!", 2},
+    {"?", 1},
+    {"#", 1},
+    {".", 1},
+    {",", 1},
+    {"new", 1},
+    {"delete", 1}
+    // Add other custom operators here with their respective precedence
+};
+
+bool jcc::CompilationUnit::parse_expression_helper(jcc::TokenList &tokens, jcc::CompilationUnit::ExpNode &output)
+{
+    /// TODO: implement this
+    (void)tokens;
+    output = ExpNode(Token(TokenType::NumberLiteral, (uint64_t)0), {});
+
+    tokens.pop();
+
+    return true;
+}
+
+bool jcc::CompilationUnit::parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    ExpNode output;
+    parse_expression_helper(tokens, output);
+
+    auto item = std::make_shared<LiteralExpression>(std::to_string(std::get<uint64_t>(output.value.value())));
+
+    node = std::static_pointer_cast<GenericNode>(item);
 
     return true;
 }
@@ -694,10 +1305,31 @@ std::shared_ptr<jcc::AbstractSyntaxTree> jcc::CompilationUnit::parse(const jcc::
 
     std::shared_ptr<GenericNode> rootnode;
 
-    if (!parse_code(tokens_copy, rootnode))
+    // reuse parse block code by
+    // wrapping source in a block
+    // and parsing it
+    // tokens array is reversed
+    tokens_copy.m_tokens.insert(tokens_copy.m_tokens.begin(), Token(TokenType::Punctuator, Punctuator::CloseBrace));
+    tokens_copy.m_tokens.push_back(Token(TokenType::Punctuator, Punctuator::OpenBrace));
+
+    if (!parse_block(tokens_copy, rootnode))
     {
         return nullptr;
     }
+
+    if (rootnode->type() != NodeType::Block)
+    {
+        throw ParserException("Expected block as root node");
+        return nullptr;
+    }
+
+    if (std::static_pointer_cast<Block>(rootnode)->children().size() != 1)
+    {
+        throw ParserException("Expected single child in root node");
+        return nullptr;
+    }
+
+    rootnode = std::static_pointer_cast<Block>(rootnode)->children()[0];
 
     if (rootnode == nullptr)
     {

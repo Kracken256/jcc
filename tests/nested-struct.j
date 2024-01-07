@@ -3,13 +3,14 @@ namespace App {
     struct Color {
         r: long = 0
         g: long = 0
-        b: long:34 = 0
+        b: long = 0
         a: int = 0xff
     }
 
     struct Point {
         x: int = 0
         y: int = 0
+        z: int = 0
     }
 
     struct Line {
@@ -19,24 +20,24 @@ namespace App {
     }
 
     struct Rect {
-        x: int = 0
-        y: int = 0
-        w: int = 0
-        h: int = 0
+        tl: Point
+        br: Point
         color: Color
     }
 
     struct Circle {
-        x: int = 0
-        y: int = 0
+        center: Point
         r: int = 0
         color: Color
     }
 
     struct Text {
-        x: int = 0
-        y: int = 0
+        tl: Point
         text: string = "Your text here"
         color: Color
     }
+}
+
+func get_return_value(x:int) -> dword {
+    return 42
 }

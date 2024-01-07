@@ -354,7 +354,6 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"?", 1},      // ternary
     {"#", 1},      // preprocessor
     {".", 1},      // member access
-    {",", 1},      // comma
     {"new", 3},    // dynamic allocation
     {"delete", 6}, // dynamic deallocation
 };
@@ -709,6 +708,12 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                 size_t kw_length = strlen(kw.first);
                 if (src_length - i >= kw_length && source.substr(i, kw_length) == kw.first)
                 {
+                    // verify next character is not an identifier character
+                    if (src_length - i > kw_length && std::strchr(lexIdentifierChars, source[i + kw_length]))
+                    {
+                        break;
+                    }
+
                     result.push_back(Token(TokenType::Keyword, kw.second));
                     i += kw_length - 1;
                     found = true;
