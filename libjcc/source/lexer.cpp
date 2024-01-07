@@ -362,8 +362,6 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"?", 1},      // ternary
     {"#", 1},      // preprocessor
     {".", 1},      // member access
-    {"new", 3},    // dynamic allocation
-    {"delete", 6}, // dynamic deallocation
 };
 
 static const char lexIdentifierChars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";

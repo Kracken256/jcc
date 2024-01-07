@@ -49,6 +49,7 @@ namespace jcc
 
         NamespaceDefinition,
         StructField,
+        StructMethod,
         StructAttribute,
         StructDefinition,
         FunctionDefinition,
@@ -463,11 +464,40 @@ namespace jcc
         std::vector<std::shared_ptr<StructAttribute>> m_attributes;
     };
 
+    class StructMethod : public GenericNode
+    {
+    public:
+        StructMethod(NodeType type = NodeType::StructMethod) : GenericNode(type) {}
+        StructMethod(const std::string &name, const std::string &type, const std::vector<std::shared_ptr<FunctionParameter>> &parameters, std::shared_ptr<Block> block) : GenericNode(NodeType::StructMethod), m_name(name), m_type(type), m_parameters(parameters), m_block(block) {}
+        virtual ~StructMethod() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::string &type() const { return m_type; }
+        std::string &type() { return m_type; }
+
+        const std::vector<std::shared_ptr<FunctionParameter>> &parameters() const { return m_parameters; }
+        std::vector<std::shared_ptr<FunctionParameter>> &parameters() { return m_parameters; }
+
+        const std::shared_ptr<Block> &block() const { return m_block; }
+        std::shared_ptr<Block> &block() { return m_block; }
+
+        std::string to_string() const override { return "StructMethod(" + m_name + ", " + m_type + ")"; }
+        std::string to_json() const override;
+
+    protected:
+        std::string m_name;
+        std::string m_type;
+        std::vector<std::shared_ptr<FunctionParameter>> m_parameters;
+        std::shared_ptr<Block> m_block;
+    };
+
     class StructDefinition : public Definition
     {
     public:
         StructDefinition(NodeType type = NodeType::StructDefinition) : Definition(type) {}
-        StructDefinition(const std::string &name, std::vector<std::shared_ptr<StructField>> fields, bool packed = false) : Definition(NodeType::StructDefinition), m_name(name), m_fields(fields), m_packed(packed) {}
+        StructDefinition(const std::string &name, std::vector<std::shared_ptr<StructField>> fields, const std::vector<std::shared_ptr<StructMethod>> &methods, bool packed = false) : Definition(NodeType::StructDefinition), m_name(name), m_fields(fields), m_methods(methods), m_packed(packed) {}
         virtual ~StructDefinition() {}
 
         const std::string &name() const { return m_name; }
@@ -475,6 +505,9 @@ namespace jcc
 
         const std::vector<std::shared_ptr<StructField>> &fields() const { return m_fields; }
         std::vector<std::shared_ptr<StructField>> &fields() { return m_fields; }
+
+        const std::vector<std::shared_ptr<StructMethod>> &methods() const { return m_methods; }
+        std::vector<std::shared_ptr<StructMethod>> &methods() { return m_methods; }
 
         const bool &packed() const { return m_packed; }
         bool &packed() { return m_packed; }
@@ -485,6 +518,7 @@ namespace jcc
     protected:
         std::string m_name;
         std::vector<std::shared_ptr<StructField>> m_fields;
+        std::vector<std::shared_ptr<StructMethod>> m_methods;
         bool m_packed;
     };
 

@@ -382,8 +382,6 @@ namespace jcc
         Ternary,
         Preprocessor,
         MemberAccess,
-        New,
-        Delete,
     };
 
     const std::map<const char *, jcc::Operator> lexOperatorMap = {
@@ -435,9 +433,7 @@ namespace jcc
 
         {"?", jcc::Operator::Ternary},
         {"#", jcc::Operator::Preprocessor},
-        {".", jcc::Operator::MemberAccess},
-        {"new", jcc::Operator::New},
-        {"delete", jcc::Operator::Delete}};
+        {".", jcc::Operator::MemberAccess}};
 
     const std::map<jcc::Operator, const char *> lexOperatorMapReverse = {
         {jcc::Operator::PlusEquals, "+="},
@@ -488,9 +484,7 @@ namespace jcc
         {jcc::Operator::Not, "!"},
         {jcc::Operator::Ternary, "?"},
         {jcc::Operator::Preprocessor, "#"},
-        {jcc::Operator::MemberAccess, "."},
-        {jcc::Operator::New, "new"},
-        {jcc::Operator::Delete, "delete"}};
+        {jcc::Operator::MemberAccess, "."}};
 
     typedef std::variant<std::string, uint64_t, double, Operator, Keyword, Punctuator>
         TokenValueType;

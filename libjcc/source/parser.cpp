@@ -274,6 +274,25 @@ std::string jcc::StructField::to_json() const
 }
 
 ///=============================================================================
+/// StructMethod
+///=============================================================================
+
+std::string jcc::StructMethod::to_json() const
+{
+    std::string str = "{\"type\":\"struct_member\",\"name\":\"" + json_escape(m_name) + "\",\"return_type\":\"" + json_escape(m_type) + "\",\"parameters\":[";
+    for (auto &parameter : m_parameters)
+    {
+        str += parameter->to_json() + ",";
+    }
+    if (m_parameters.size() > 0)
+    {
+        str.pop_back();
+    }
+    str += "],\"block\":" + m_block->to_json() + "}";
+    return str;
+}
+
+///=============================================================================
 /// StructDefinition
 ///=============================================================================
 
@@ -594,6 +613,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
     std::vector<std::shared_ptr<StructField>> fields;
 
     std::shared_ptr<StructField> field = std::make_shared<StructField>();
+    std::vector<std::shared_ptr<StructMethod>> functions;
 
     while (1)
     {
@@ -728,7 +748,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
 
             // type
             curtok = tokens.peek();
-            if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+            if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword && curtok.type() != TokenType::Punctuator)
             {
                 throw SyntaxError("Expected type in struct field");
                 return false;
@@ -750,6 +770,84 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                     throw SyntaxError("Expected type in struct field");
                     return false;
                 }
+                break;
+            case TokenType::Punctuator:
+            {
+                std::vector<std::shared_ptr<FunctionParameter>> params;
+                if (!parse_function_parameters(tokens, params))
+                {
+                    return false;
+                }
+
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected block in struct field");
+                    return false;
+                }
+
+                curtok = tokens.peek();
+
+                std::string return_type = "void";
+
+                if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+                {
+                    tokens.pop();
+
+                    if (tokens.eof())
+                    {
+                        throw SyntaxError("Expected type in struct field");
+                        return false;
+                    }
+
+                    curtok = tokens.peek();
+
+                    if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+                    {
+                        throw SyntaxError("Expected type in struct field");
+                        return false;
+                    }
+
+                    switch (curtok.type())
+                    {
+                    case TokenType::Identifier:
+                        return_type = std::get<std::string>(curtok.value());
+                        break;
+                    case TokenType::Keyword:
+                        // check if
+                        if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
+                        {
+                            return_type = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+                        }
+                        else
+                        {
+                            throw SyntaxError("Expected type in struct field");
+                            return false;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+
+                    if (tokens.eof())
+                    {
+                        throw SyntaxError("Expected block in struct field");
+                        return false;
+                    }
+                    tokens.pop();
+                    curtok = tokens.peek();
+                }
+
+                std::shared_ptr<GenericNode> block;
+                if (!parse_block(tokens, block))
+                {
+                    return false;
+                }
+
+                std::shared_ptr<StructMethod> function = std::make_shared<StructMethod>(field->name(), return_type, params, std::static_pointer_cast<Block>(block));
+                functions.push_back(function);
+                continue;
+            }
+            break;
 
             default:
                 break;
@@ -901,7 +999,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
         }
     }
 
-    node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields, packed);
+    node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields, functions, packed);
 
     if (fields.empty())
     {
@@ -1470,8 +1568,6 @@ std::map<std::string, uint32_t> operator_precedence = {
     {"#", 1},
     {".", 1},
     {",", 1},
-    {"new", 1},
-    {"delete", 1}
     // Add other custom operators here with their respective precedence
 };
 

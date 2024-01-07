@@ -1,6 +1,6 @@
 //==================================================================//
 // Type: J++ Transpiled Code                                        //
-// Date: Thu Apr 12 11:13:44 4461545 HST                               //
+// Date: Fri Jan 27 01:10:34 4461273 HST                               //
 //==================================================================//
 
 #include <cstdint>
@@ -156,12 +156,13 @@ namespace _j {
 };
 
 //==================================================================//
-// File: /tmp/fileZXcmYV.cpp                                        //
+// File: /tmp/file4Q0jx0.cpp                                        //
 //==================================================================//
 
 namespace _jxx
 {
     /* Begin Structure _uuid_t */
+    #pragma pack(push, 1)
     class _uuid_t : public _j::StructGeneric<0>
     {
     public:
@@ -201,6 +202,22 @@ namespace _jxx
             this->_set("_index_types", "dword=0,word=0,word=0,word=0,dword=0,word=0");
         }
 
+        _uuid_t _new(const string& _uuidString)
+        {
+        }
+
+        _uuid_t _copy(const _uuid_t& _uuid)
+        {
+        }
+
+        string _toString()
+        {
+        }
+
+        int _cmp(const _uuid_t& _other)
+        {
+        }
+
         dword _a = 0;
         word _b = 0;
         word _c = 0;
@@ -208,6 +225,7 @@ namespace _jxx
         dword _e = 0;
         word _f = 0;
     };
+    #pragma pack(pop)
     constexpr auto j__uuid_t_size = sizeof(_uuid_t);
     /* End Structure _uuid_t */
 
@@ -215,7 +233,7 @@ namespace _jxx
     
     int _main()
     {
-        _hello();
+        printf("Hello, world!\n")
         return 0;
     }
 
@@ -223,7 +241,7 @@ namespace _jxx
 
 
 //==================================================================//
-// EOF: /tmp/fileZXcmYV.cpp                                         //
+// EOF: /tmp/file4Q0jx0.cpp                                         //
 //==================================================================//
 
 
@@ -235,5 +253,5 @@ int main(int argc, char **argv)
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// ff3ab84dc1ad022f616178d4106d38a38f68bb9b2c211ff8541788132289ce22 //
+// 9fe8dbe67847b9cf7569ab244a1c0a14cb3a0e6e1e0d85cec90c7eb31a0cfbf0 //
 //==================================================================//

@@ -329,6 +329,11 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
     result += mkpadding(indent) + "}\n\n";
 
+    for (const auto &members : structdef->methods())
+    {
+        result += generate_node_cxx(members, indent);
+    }
+
     for (const auto &field : structdef->fields())
     {
         if (field->arr_size() != std::numeric_limits<uint64_t>::max())
@@ -434,6 +439,42 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
     return result;
 }
 
+
+static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent)
+{
+    auto funcdef = std::static_pointer_cast<StructMethod>(node);
+    std::string result = mkpadding(indent);
+
+    if (funcdef->type().empty())
+    {
+        result += "[[noreturn]] void";
+    }
+    else
+    {
+        result += funcdef->type();
+    }
+
+    result += " " + funcdef->name() + "(";
+
+    for (size_t i = 0; i < funcdef->parameters().size(); i++)
+    {
+        result += generate_function_parameter_cxx(funcdef->parameters()[i], indent);
+
+        if (i != funcdef->parameters().size() - 1)
+        {
+            result += ", ";
+        }
+    }
+
+    result += ")\n";
+
+    result += generate_block_cxx(funcdef->block(), indent);
+
+    result += "\n";
+
+    return result;
+}
+
 static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent)
 {
     if (node == nullptr)
@@ -466,6 +507,8 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return generate_namespace_definition_cxx(node, indent);
     case NodeType::StructDefinition:
         return generate_struct_definition_cxx(node, indent);
+    case NodeType::StructMethod:
+        return generate_struct_method_cxx(node, indent);
     case NodeType::FunctionDefinition:
         return generate_function_definition_cxx(node, indent);
 
