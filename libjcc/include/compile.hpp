@@ -244,6 +244,8 @@ namespace jcc
             DeclarationOrDefinition,
         };
 
+        bool parse_function_parameters(TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params);
+
         bool parse_func_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, FunctionParseMode mode = FunctionParseMode::DeclarationOrDefinition);
 
         bool parse_namespace_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);

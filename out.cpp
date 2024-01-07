@@ -1,6 +1,6 @@
 //==================================================================//
 // Type: J++ Transpiled Code                                        //
-// Date: Thu Apr 12 08:17:34 4461545 HST                               //
+// Date: Thu Apr 12 11:13:44 4461545 HST                               //
 //==================================================================//
 
 #include <cstdint>
@@ -156,7 +156,7 @@ namespace _j {
 };
 
 //==================================================================//
-// File: /tmp/fileRez0gk.cpp                                        //
+// File: /tmp/fileZXcmYV.cpp                                        //
 //==================================================================//
 
 namespace _jxx
@@ -211,14 +211,11 @@ namespace _jxx
     constexpr auto j__uuid_t_size = sizeof(_uuid_t);
     /* End Structure _uuid_t */
 
+    void _hello(const _uuid_t& _id, const vector<string>& _name);
     
-#define UUID_SIZE 36
-
     int _main()
     {
-        char uuid[UUID_SIZE];
-        printf("Hello, world!\n");
-        printf("UUID_SIZE: %d\n", UUID_SIZE);
+        _hello();
         return 0;
     }
 
@@ -226,7 +223,7 @@ namespace _jxx
 
 
 //==================================================================//
-// EOF: /tmp/fileRez0gk.cpp                                         //
+// EOF: /tmp/fileZXcmYV.cpp                                         //
 //==================================================================//
 
 
@@ -238,5 +235,5 @@ int main(int argc, char **argv)
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// c5024914e4ddfefa47df515ab0ed056d6a7dc7012f6f3371ca7bb3652175d3a2 //
+// ff3ab84dc1ad022f616178d4106d38a38f68bb9b2c211ff8541788132289ce22 //
 //==================================================================//

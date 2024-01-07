@@ -961,6 +961,255 @@ bool jcc::CompilationUnit::parse_namespace_keyword(jcc::TokenList &tokens, std::
     return true;
 }
 
+bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params)
+{
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected closing parenthesis in function parameters");
+        return false;
+    }
+
+    Token curtok = tokens.peek();
+
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenParen)
+    {
+        throw SyntaxError("Expected opening parenthesis in function parameters");
+        return false;
+    }
+    tokens.pop();
+    curtok = tokens.peek();
+
+    bool is_looping = true;
+    while (is_looping)
+    {
+        Token curtok = tokens.peek();
+
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseParen)
+        {
+            tokens.pop();
+            is_looping = false;
+            break;
+        }
+        if (curtok.type() != TokenType::Identifier)
+        {
+            throw SyntaxError("Expected identifier in function parameter");
+            return false;
+        }
+
+        std::shared_ptr<FunctionParameter> parameter = std::make_shared<FunctionParameter>();
+        parameter->name() = std::get<std::string>(curtok.value());
+
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected seperator in function parameter");
+            return false;
+        }
+        curtok = tokens.peek();
+        if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+        {
+            throw SyntaxError("Expected seperator in function parameter");
+            return false;
+        }
+        tokens.pop();
+
+        int state = 2;
+
+        while (state > 0)
+        {
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected seperator in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
+            {
+                throw SyntaxError("Expected type in function parameter type");
+                return false;
+            }
+
+            switch (curtok.type())
+            {
+            case TokenType::Identifier:
+                parameter->type() = std::get<std::string>(curtok.value());
+                tokens.pop();
+                state = 0;
+                break;
+            case TokenType::Keyword:
+                // check if
+                {
+                    if (state == 2)
+                    {
+                        if (std::get<Keyword>(curtok.value()) == Keyword::Const)
+                        {
+                            parameter->is_const() = true;
+                            tokens.pop();
+                            state = 1;
+                            continue;
+                        }
+
+                        if (std::get<Keyword>(curtok.value()) == Keyword::Ref)
+                        {
+                            parameter->is_reference() = true;
+                            parameter->is_const() = false;
+                            tokens.pop();
+                            state = 1;
+                            continue;
+                        }
+                    }
+
+                    std::string tmp = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+                    if (is_builtin_type(tmp))
+                    {
+                        if (tmp == "null")
+                        {
+                            throw SyntaxError("Parameter type cannot be null");
+                        }
+                        else if (tmp == "void")
+                        {
+                            throw SyntaxError("Parameter type cannot be void");
+                        }
+                        parameter->type() = tmp;
+                        tokens.pop();
+                        state = 0;
+                        continue;
+                    }
+                    else
+                    {
+                        throw SyntaxError("Expected type annotation in function parameter");
+                        return false;
+                    }
+                }
+                break;
+            default:
+                panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
+                break;
+            }
+        }
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected seperator in function declaration");
+            return false;
+        }
+        curtok = tokens.peek();
+
+        // check for array
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
+        {
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() == TokenType::NumberLiteral)
+            {
+                parameter->arr_size() = std::get<uint64_t>(curtok.value());
+                tokens.pop();
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected closing bracket in function parameter");
+                    return false;
+                }
+                curtok = tokens.peek();
+            }
+            else
+            {
+                parameter->arr_size() = std::numeric_limits<uint64_t>::max();
+            }
+
+            if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBracket)
+            {
+                tokens.pop();
+            }
+            else
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+        }
+
+        if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
+        {
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected default value in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::StringLiteral && curtok.type() != TokenType::NumberLiteral && curtok.type() != TokenType::FloatingPointLiteral && curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword && curtok.type() != TokenType::Punctuator)
+            {
+                throw SyntaxError("Expected default value in function parameter");
+                return false;
+            }
+
+            switch (curtok.type())
+            {
+            case TokenType::StringLiteral:
+                parameter->default_value() = std::make_shared<StringLiteralExpression>(std::get<std::string>(curtok.value()));
+                break;
+            case TokenType::NumberLiteral:
+                parameter->default_value() = std::make_shared<IntegerLiteralExpression>(std::to_string(std::get<uint64_t>(curtok.value())));
+                break;
+            case TokenType::FloatingPointLiteral:
+                parameter->default_value() = std::make_shared<FloatingPointLiteralExpression>(std::to_string(std::get<double>(curtok.value())));
+                break;
+            case TokenType::Identifier:
+            {
+                std::shared_ptr<GenericNode> expr;
+                if (!parse_expression(tokens, expr))
+                {
+                    return false;
+                }
+                parameter->default_value() = std::static_pointer_cast<Expression>(expr);
+                break;
+            }
+            case TokenType::Keyword:
+                if (std::get<Keyword>(curtok.value()) == Keyword::Null)
+                {
+                    parameter->default_value() = std::make_shared<NullExpression>();
+                }
+                else
+                {
+                    throw SyntaxError("Expected default value in function parameter");
+                    return false;
+                }
+                break;
+            default:
+            {
+                std::shared_ptr<GenericNode> expr;
+                if (!parse_expression(tokens, expr))
+                {
+                    return false;
+                }
+                parameter->default_value() = std::static_pointer_cast<Expression>(expr);
+            }
+            }
+
+            tokens.pop();
+        }
+
+        params.push_back(parameter);
+
+        curtok = tokens.peek();
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Comma)
+        {
+            tokens.pop();
+        }
+    }
+
+    return true;
+}
+
 bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::CompilationUnit::FunctionParseMode mode)
 {
     // func name ([[name:type[=default]]...]) [-> return_type] [block]
@@ -980,106 +1229,14 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
         return false;
     }
 
-    if (next_2.type() != TokenType::Punctuator || std::get<Punctuator>(next_2.value()) != Punctuator::OpenParen)
-    {
-        throw SyntaxError("Expected opening parenthesis after func identifier");
-        return false;
-    }
-
     // parse parameters
     std::vector<std::shared_ptr<FunctionParameter>> parameters;
 
-    tokens.pop(3);
+    tokens.pop(2);
 
-    bool is_looping = true;
-    while (is_looping)
+    if (!parse_function_parameters(tokens, parameters))
     {
-        Token curtok = tokens.peek();
-
-        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseParen)
-        {
-            tokens.pop();
-            is_looping = false;
-            break;
-        }
-
-        if (curtok.type() != TokenType::Identifier)
-        {
-            throw SyntaxError("Expected identifier in function parameter");
-            return false;
-        }
-
-        std::shared_ptr<FunctionParameter> parameter = std::make_shared<FunctionParameter>();
-        parameter->name() = std::get<std::string>(curtok.value());
-
-        tokens.pop();
-
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected seperator in function parameter");
-            return false;
-        }
-
-        curtok = tokens.peek();
-
-        if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
-        {
-            throw SyntaxError("Expected seperator in function parameter");
-            return false;
-        }
-
-        tokens.pop();
-
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected type in function parameter");
-            return false;
-        }
-
-        curtok = tokens.peek();
-
-        if (curtok.type() != TokenType::Identifier && curtok.type() != TokenType::Keyword)
-        {
-            throw SyntaxError("Expected type in function parameter type");
-            return false;
-        }
-
-        switch (curtok.type())
-        {
-        case TokenType::Identifier:
-            parameter->type() = std::get<std::string>(curtok.value());
-            break;
-        case TokenType::Keyword:
-            // check if
-            if (is_builtin_type(lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()))))
-            {
-                parameter->type() = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
-            }
-            else
-            {
-                throw SyntaxError("Expected type in function parameter type");
-                return false;
-            }
-            break;
-        default:
-            panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
-            break;
-        }
-
-        tokens.pop();
-
-        parameters.push_back(parameter);
-
-        if (tokens.eof())
-        {
-            break;
-        }
-
-        curtok = tokens.peek();
-        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Comma)
-        {
-            tokens.pop();
-        }
+        return false;
     }
 
     if (tokens.eof())
@@ -1090,6 +1247,7 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
 
     Token curtok = tokens.peek();
     std::string return_type;
+    uint64_t return_arr_size = 0;
 
     if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
     {
@@ -1135,13 +1293,61 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
                 return false;
             }
         }
-
         tokens.pop();
+
+        // check for array
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected token in function parameter");
+            return false;
+        }
+        curtok = tokens.peek();
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
+        {
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() == TokenType::NumberLiteral)
+            {
+                return_arr_size = std::get<uint64_t>(curtok.value());
+                tokens.pop();
+                if (tokens.eof())
+                {
+                    throw SyntaxError("Expected closing bracket in function parameter");
+                    return false;
+                }
+                curtok = tokens.peek();
+            }
+            else
+            {
+                return_arr_size = std::numeric_limits<uint64_t>::max();
+            }
+
+            if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBracket)
+            {
+                tokens.pop();
+            }
+            else
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected closing bracket in function parameter");
+                return false;
+            }
+            curtok = tokens.peek();
+        }
     }
     else if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenBrace)
     {
         return_type = "void"; // implicit void return type
-        std::shared_ptr<FunctionDeclaration> func_ptr = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters);
+        std::shared_ptr<FunctionDeclaration> func_ptr = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters, return_arr_size);
         node = func_ptr;
 
         return true;
@@ -1167,10 +1373,10 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
             return false;
         }
 
-        node = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters);
+        node = std::make_shared<FunctionDeclaration>(std::get<std::string>(next_1.value()), return_type, parameters, return_arr_size);
     }
     else
-    {   
+    {
         if (mode != FunctionParseMode::DefinitionOnly && mode != FunctionParseMode::DeclarationOrDefinition)
         {
             throw SyntaxError("Function declaration expected but definition found");
@@ -1183,7 +1389,7 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
             return false;
         }
 
-        node = std::make_shared<FunctionDefinition>(std::get<std::string>(next_1.value()), return_type, parameters, std::static_pointer_cast<Block>(block));
+        node = std::make_shared<FunctionDefinition>(std::get<std::string>(next_1.value()), return_type, parameters, std::static_pointer_cast<Block>(block), return_arr_size);
     }
 
     return true;

@@ -793,7 +793,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     }
     catch (const SyntaxError &e)
     {
-        this->push_message(CompilerMessageType::Error, "Parser error: " + std::string(e.what()));
+        this->push_message(CompilerMessageType::Error, "Syntax error: " + std::string(e.what()));
         return false;
     }
     catch (const SemanticError &e)

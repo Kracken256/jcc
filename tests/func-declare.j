@@ -27,7 +27,14 @@ struct uuid_t {
     f: word = 0
 }
 
+func hello(id: uuid_t, name: string[] ): void
+
+
+``
+
 func main(): int {
-    `printf("Hello, World!\n");`
+    
+    `_hello();`
+
     return 0
 }

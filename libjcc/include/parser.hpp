@@ -59,6 +59,7 @@ namespace jcc
         BinaryExpression,
         UnaryExpression,
         CastExpression,
+        NullExpression,
         LiteralExpression,
         CallExpression,
         StringLiteralExpression,
@@ -264,8 +265,8 @@ namespace jcc
     class FunctionParameter : public GenericNode
     {
     public:
-        FunctionParameter(NodeType type = NodeType::FunctionParameter) : GenericNode(type) {}
-        FunctionParameter(const std::string &name, const std::string &type, const std::string &default_value) : GenericNode(NodeType::FunctionParameter), m_name(name), m_type(type), m_default_value(default_value) {}
+        FunctionParameter(NodeType type = NodeType::FunctionParameter) : GenericNode(type), m_arr_size(0), m_is_const(false), m_is_reference(false) {}
+        FunctionParameter(const std::string &name, const std::string &type, const std::shared_ptr<Expression> &default_value, uint64_t arr_size = 0, bool is_const = false, bool is_reference = false) : GenericNode(NodeType::FunctionParameter), m_name(name), m_type(type), m_arr_size(arr_size), m_default_value(default_value), m_is_const(is_const), m_is_reference(is_reference) {}
         virtual ~FunctionParameter() {}
 
         const std::string &name() const { return m_name; }
@@ -274,27 +275,42 @@ namespace jcc
         const std::string &type() const { return m_type; }
         std::string &type() { return m_type; }
 
-        const std::string &default_value() const { return m_default_value; }
-        std::string &default_value() { return m_default_value; }
+        const std::shared_ptr<Expression> &default_value() const { return m_default_value; }
+        std::shared_ptr<Expression> &default_value() { return m_default_value; }
+
+        const uint64_t &arr_size() const { return m_arr_size; }
+        uint64_t &arr_size() { return m_arr_size; }
 
         std::string to_string() const override;
         std::string to_json() const override;
 
+        const bool &is_const() const { return m_is_const; }
+        bool &is_const() { return m_is_const; }
+
+        const bool &is_reference() const { return m_is_reference; }
+        bool &is_reference() { return m_is_reference; }
+
     protected:
         std::string m_name;
         std::string m_type;
-        std::string m_default_value;
+        uint64_t m_arr_size;
+        std::shared_ptr<Expression> m_default_value;
+        bool m_is_const;
+        bool m_is_reference;
     };
 
     class FunctionDeclaration : public Declaration
     {
     public:
-        FunctionDeclaration(NodeType type = NodeType::FunctionDeclaration) : Declaration(type) {}
-        FunctionDeclaration(const std::string &name, const std::string &return_type, std::vector<std::shared_ptr<FunctionParameter>> parameters) : Declaration(NodeType::FunctionDeclaration), m_return_type(return_type), m_parameters(parameters), m_name(name) {}
+        FunctionDeclaration(NodeType type = NodeType::FunctionDeclaration) : Declaration(type), m_return_arr_size(0) {}
+        FunctionDeclaration(const std::string &name, const std::string &return_type, std::vector<std::shared_ptr<FunctionParameter>> parameters, uint64_t return_arr_size = 0) : Declaration(NodeType::FunctionDeclaration), m_return_type(return_type), m_parameters(parameters), m_name(name), m_return_arr_size(return_arr_size) {}
         virtual ~FunctionDeclaration() {}
 
         const std::string &return_type() const { return m_return_type; }
         std::string &return_type() { return m_return_type; }
+
+        const uint64_t &return_arr_size() const { return m_return_arr_size; }
+        uint64_t &return_arr_size() { return m_return_arr_size; }
 
         const std::vector<std::shared_ptr<FunctionParameter>> &parameters() const { return m_parameters; }
         std::vector<std::shared_ptr<FunctionParameter>> &parameters() { return m_parameters; }
@@ -309,6 +325,7 @@ namespace jcc
         std::string m_return_type;
         std::vector<std::shared_ptr<FunctionParameter>> m_parameters;
         std::string m_name;
+        uint64_t m_return_arr_size;
     };
 
     class ClassDeclaration : public TypeDeclaration
@@ -413,7 +430,7 @@ namespace jcc
     {
     public:
         StructField(NodeType type = NodeType::StructField) : GenericNode(type), m_bitfield(0), m_arr_size(0) {}
-        StructField(const std::string &name, const std::string &type, uint64_t bitfield, const std::string &default_value, size_t arr_size = 0, const std::vector<std::shared_ptr<StructAttribute>> &attributes = {}) : GenericNode(NodeType::StructField), m_name(name), m_type(type), m_bitfield(bitfield), m_default_value(default_value), m_arr_size(arr_size), m_attributes(attributes) {}
+        StructField(const std::string &name, const std::string &type, uint64_t bitfield, const std::string &default_value, uint64_t arr_size = 0, const std::vector<std::shared_ptr<StructAttribute>> &attributes = {}) : GenericNode(NodeType::StructField), m_name(name), m_type(type), m_bitfield(bitfield), m_default_value(default_value), m_arr_size(arr_size), m_attributes(attributes) {}
         virtual ~StructField() {}
 
         const std::string &name() const { return m_name; }
@@ -428,8 +445,8 @@ namespace jcc
         const uint64_t &bitfield() const { return m_bitfield; }
         uint64_t &bitfield() { return m_bitfield; }
 
-        const size_t &arr_size() const { return m_arr_size; }
-        size_t &arr_size() { return m_arr_size; }
+        const uint64_t &arr_size() const { return m_arr_size; }
+        uint64_t &arr_size() { return m_arr_size; }
 
         const std::vector<std::shared_ptr<StructAttribute>> &attributes() const { return m_attributes; }
         std::vector<std::shared_ptr<StructAttribute>> &attributes() { return m_attributes; }
@@ -442,7 +459,7 @@ namespace jcc
         std::string m_type;
         uint64_t m_bitfield;
         std::string m_default_value;
-        size_t m_arr_size;
+        uint64_t m_arr_size;
         std::vector<std::shared_ptr<StructAttribute>> m_attributes;
     };
 
@@ -474,12 +491,15 @@ namespace jcc
     class FunctionDefinition : public Definition
     {
     public:
-        FunctionDefinition(NodeType type = NodeType::FunctionDefinition) : Definition(type) {}
-        FunctionDefinition(const std::string &name, const std::string &return_type, std::vector<std::shared_ptr<FunctionParameter>> parameters, std::shared_ptr<Block> block) : Definition(NodeType::FunctionDefinition), m_return_type(return_type), m_parameters(parameters), m_name(name), m_block(block) {}
+        FunctionDefinition(NodeType type = NodeType::FunctionDefinition) : Definition(type), m_return_arr_size(0) {}
+        FunctionDefinition(const std::string &name, const std::string &return_type, std::vector<std::shared_ptr<FunctionParameter>> parameters, std::shared_ptr<Block> block, uint64_t return_arr_size = 0) : Definition(NodeType::FunctionDefinition), m_return_type(return_type), m_parameters(parameters), m_name(name), m_block(block), m_return_arr_size(return_arr_size) {}
         virtual ~FunctionDefinition() {}
 
         const std::string &return_type() const { return m_return_type; }
         std::string &return_type() { return m_return_type; }
+
+        const uint64_t &return_arr_size() const { return m_return_arr_size; }
+        uint64_t &return_arr_size() { return m_return_arr_size; }
 
         const std::vector<std::shared_ptr<FunctionParameter>> &parameters() const { return m_parameters; }
         std::vector<std::shared_ptr<FunctionParameter>> &parameters() { return m_parameters; }
@@ -498,6 +518,7 @@ namespace jcc
         std::vector<std::shared_ptr<FunctionParameter>> m_parameters;
         std::string m_name;
         std::shared_ptr<Block> m_block;
+        uint64_t m_return_arr_size;
     };
 
     ///=================================================================================================
@@ -569,6 +590,23 @@ namespace jcc
     protected:
         std::string m_type;
         std::shared_ptr<Expression> m_expression;
+    };
+
+    class NullExpression : public Expression
+    {
+    public:
+        NullExpression(NodeType type = NodeType::NullExpression) : Expression(type) {}
+        NullExpression(const std::string &type) : Expression(NodeType::NullExpression), m_type(type) {}
+        virtual ~NullExpression() {}
+
+        const std::string &type() const { return m_type; }
+        std::string &type() { return m_type; }
+
+        std::string to_string() const override { return "NullExpression(" + m_type + ")"; }
+        std::string to_json() const override { return "{\"type\":\"null_expression\",\"type\":\"" + json_escape(m_type) + "\"}"; }
+
+    protected:
+        std::string m_type;
     };
 
     class CallExpression : public Expression

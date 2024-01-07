@@ -1078,13 +1078,15 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
         case LexerState::Raw:
             if (current_char == '`')
             {
-                if (!current_token.empty())
+                if (modifier == LexerStateModifier::StringEscape)
                 {
                     result.push_back(Token(TokenType::Raw, current_token));
                     current_token.clear();
                     state = LexerState::Default;
+                    modifier = LexerStateModifier::None;
                     break;
                 }
+                modifier = LexerStateModifier::StringEscape;
             }
             else
             {

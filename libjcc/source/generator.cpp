@@ -95,13 +95,48 @@ static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::Gene
 static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent)
 {
     auto param = std::static_pointer_cast<FunctionParameter>(node);
-    std::string result = param->type() + " " + param->name();
+    std::string result;
 
-    (void)indent;
-
-    if (!param->default_value().empty())
+    if (param->arr_size() == std::numeric_limits<uint64_t>::max())
     {
-        result += " = " + param->default_value();
+        if (!param->is_reference() || param->is_const())
+        {
+            result += "const ";
+        }
+
+        result += "vector<" + param->type() + ">";
+        if (param->is_reference() || (!param->is_reference() || param->is_const()))
+        {
+            result += "&";
+        }
+        result += " " + param->name();
+    }
+    else if (param->arr_size() > 0)
+    {
+        if (param->is_const())
+        {
+            result += "const ";
+        }
+        result += param->type() + " " + param->name() + "[" + std::to_string(param->arr_size()) + "]";
+    }
+    else
+    {
+        if (!param->is_reference() || param->is_const())
+        {
+            result += "const ";
+        }
+
+        result += param->type();
+        if (param->is_reference() || (!param->is_reference() || param->is_const()))
+        {
+            result += "&";
+        }
+        result += " " + param->name();
+    }
+
+    if (param->default_value())
+    {
+        result += " = " + generate_node_cxx(param->default_value(), indent);
     }
 
     return result;
@@ -118,7 +153,18 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
     }
     else
     {
-        result += func->return_type();
+        if (func->return_arr_size() == std::numeric_limits<uint64_t>::max())
+        {
+            result += "vector<" + func->return_type() + ">";
+        }
+        else if (func->return_arr_size() > 0)
+        {
+            result += "std::array<" + func->return_type() + ", " + std::to_string(func->return_arr_size()) + "> ";
+        }
+        else
+        {
+            result += func->return_type();
+        }
     }
 
     result += " " + func->name() + "(";
@@ -126,6 +172,11 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
     for (const auto &param : func->parameters())
     {
         result += generate_function_parameter_cxx(param, indent);
+
+        if (param != func->parameters().back())
+        {
+            result += ", ";
+        }
     }
 
     result += ");\n";
@@ -337,7 +388,18 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
     }
     else
     {
-        result += funcdef->return_type();
+        if (funcdef->return_arr_size() == std::numeric_limits<uint64_t>::max())
+        {
+            result += "vector<" + funcdef->return_type() + ">";
+        }
+        else if (funcdef->return_arr_size() > 0)
+        {
+            result += "std::array<" + funcdef->return_type() + ", " + std::to_string(funcdef->return_arr_size()) + "> ";
+        }
+        else
+        {
+            result += funcdef->return_type();
+        }
     }
 
     result += " " + funcdef->name() + "(";
@@ -445,9 +507,9 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return result;
     }
     case NodeType::StringLiteralExpression:
-        return std::static_pointer_cast<StringLiteralExpression>(node)->value();
+        return "\"" + std::static_pointer_cast<StringLiteralExpression>(node)->value() + "\"";
     case NodeType::CharLiteralExpression:
-        return std::static_pointer_cast<CharLiteralExpression>(node)->value();
+        return "'" + std::static_pointer_cast<CharLiteralExpression>(node)->value() + "'";
     case NodeType::IntegerLiteralExpression:
         return std::static_pointer_cast<IntegerLiteralExpression>(node)->value();
     case NodeType::FloatingPointLiteralExpression:
