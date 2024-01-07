@@ -23,6 +23,16 @@ using namespace jcc;
 static std::map<size_t, std::string> g_typenames_mapping;
 static std::mutex g_typenames_mapping_mutex;
 
+struct ReflectiveEntry
+{
+    std::string field_name;
+    std::string type;
+    uint count = 1;
+};
+
+static std::map<size_t, std::vector<ReflectiveEntry>> g_reflective_entries;
+static std::mutex g_reflective_entries_mutex;
+
 uint32_t unix_timestamp();
 
 static std::string mkpadding(uint32_t indent)
@@ -240,11 +250,30 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
     object_id_mutex.lock();
     g_typenames_mapping_mutex.lock();
+    g_reflective_entries_mutex.lock();
     result += mkpadding(indent) + "class " + structdef->name() + " : public _j::StructGeneric<" + std::to_string(object_id) + ">\n" + mkpadding(indent) + "{\n";
 
     g_typenames_mapping.insert({object_id, structdef->name()});
+    ReflectiveEntry reflective_entry;
+    reflective_entry.type = structdef->name();
+    for (const auto &field : structdef->fields())
+    {
+        reflective_entry.field_name = field->name();
+        reflective_entry.type = field->type();
+        if (field->arr_size() > 0)
+        {
+            reflective_entry.count = field->arr_size();
+        }
+        else
+        {
+            reflective_entry.count = 1;
+        }
+        g_reflective_entries[object_id].push_back(reflective_entry);
+    }
+
     object_id++;
 
+    g_reflective_entries_mutex.unlock();
     g_typenames_mapping_mutex.unlock();
     object_id_mutex.unlock();
 
@@ -308,12 +337,9 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
         index += field->name() + ":" + typetmp;
         index_types += typetmp;
-        if (i != structdef->fields().size() - 1)
-        {
-            index_names += ",";
-            index_types += ",";
-            index += ",";
-        }
+        index_names += ",";
+        index_types += ",";
+        index += ",";
     }
 
     auto_attributes.insert({"_index_names", "\"" + index_names + "\""});
@@ -438,7 +464,6 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
 
     return result;
 }
-
 
 static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent)
 {
@@ -651,6 +676,15 @@ const std::string structure_generic_baseclass = R"(    /* Begin Common Sink func
     typedef _jxx::qword typeid_t;
 
     static std::map<typeid_t, _jxx::string> g_typenames_mapping = {!!!/* JCC_TYPENAMES_MAPPING */!!!};
+    static std::map<_jxx::string, typeid_t> g_typenames_mapping_reverse = {!!!/* JCC_TYPENAMES_MAPPING_REVERSE */!!!};
+    static std::map<std::string, uint> g_builtin_sizes = {{"bit", 1}, {"byte", 1}, {"char", 1}, {"word", 2}, {"short", 2}, {"dword", 4}, {"int", 4}, {"float", 4}, {"double", 8}, {"qword", 8}, {"long", 8}, {"string", 8}, {"buffer", 8}, {"routine", 8}, {"address", 8}};
+    struct ReflectiveEntry {
+        _jxx::string field_name;
+        _jxx::string type;
+        _jxx::uintn count;
+    };
+
+    static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {!!!/* JCC_REFLECTIVE_ENTRIES */!!!};
 
     template <typeid_t T>
     class StructGeneric
@@ -660,22 +694,22 @@ const std::string structure_generic_baseclass = R"(    /* Begin Common Sink func
         static std::map<typeid_t, std::map<_jxx::string, const void *>> m_attributes;
 
     public:
-        typeid_t _typeid()
+        inline typeid_t _typeid() const
         {
             return m_typeid;
         }
 
-        _jxx::string _typename()
+        inline _jxx::string _typename() const
         {
-            return g_typenames_mapping[m_typeid];
+            return g_typenames_mapping.at(m_typeid);
         }
 
-        bool _has(_jxx::string name)
+        inline bool _has(_jxx::string name) const
         {
-            return m_attributes[m_typeid].find(name) != m_attributes[m_typeid].end();
+            return m_attributes.at(m_typeid).find(name) != m_attributes.at(m_typeid).end();
         }
 
-        bool _hasfield(_jxx::string name)
+        bool _hasfield(_jxx::string name) const
         {
             _jxx::string index_names = this->_get("_index_names");
             int state = 0;
@@ -690,7 +724,7 @@ const std::string structure_generic_baseclass = R"(    /* Begin Common Sink func
                     continue;
                 }
 
-                if (strcmp(index_names, name) == 0)
+                if (strncmp(index_names, name, strlen(name)) == 0)
                 {
                     return true;
                 }
@@ -701,28 +735,57 @@ const std::string structure_generic_baseclass = R"(    /* Begin Common Sink func
             return false;
         }
 
-        void _set(_jxx::string name, _jxx::string value)
-        {
-            m_attributes[m_typeid][name] = value;
-        }
-
-        void _set(_jxx::string name, long value)
+        inline void _set(_jxx::string name, _jxx::string value) const
         {
             m_attributes[m_typeid][name] = (void *)value;
         }
 
-        _jxx::string _get(_jxx::string name)
+        inline void _set(_jxx::string name, long value) const
         {
-            if (!this->_has(name))
-                _panic("meta _get() failed: Attribute not found");
-            return (_jxx::string)m_attributes[m_typeid][name];
+            m_attributes[m_typeid][name] = (void *)value;
         }
 
-        long _getint(_jxx::string name)
+        inline _jxx::string _get(_jxx::string name) const
         {
-            if (!this->_has(name))
-                _panic("meta _getint() failed: Attribute not found");
-            return (_jxx::qword)m_attributes[m_typeid][name];
+            return (_jxx::string)m_attributes.at(m_typeid).at(name);
+        }
+
+        inline long _getint(_jxx::string name) const
+        {
+            return (_jxx::qword)m_attributes.at(m_typeid).at(name);
+        }
+
+        static inline _jxx::string _gettypename(typeid_t type)
+        {
+            return g_typenames_mapping.at(type);
+        }
+
+        static inline typeid_t _gettypeid(_jxx::string name)
+        {
+            return g_typenames_mapping_reverse.at(name);
+        }
+
+        static size_t _sizeof(typeid_t id)
+        {
+            size_t size = 0;
+            for (auto &field_type : g_reflective_entries.at(id))
+            {
+                if (g_builtin_sizes.contains(field_type.type))
+                {
+                    size += g_builtin_sizes.at(field_type.type) * field_type.count;
+                }
+                else
+                {
+                    size += _sizeof(_gettypeid(field_type.type)) * field_type.count;
+                }
+            }
+
+            return size;
+        }
+
+        inline size_t _sizeof() const
+        {
+            return _sizeof(m_typeid);
         }
     };
 
@@ -758,19 +821,58 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
     // only replace first occurrence
     std::string tmp = structure_generic_baseclass;
     std::string new_value;
+    std::string new_value_reverse;
     for (auto it = g_typenames_mapping.begin(); it != g_typenames_mapping.end(); ++it)
     {
         new_value += "{" + std::to_string(it->first) + ", \"" + it->second + "\"}";
+        new_value_reverse += "{\"" + it->second + "\", " + std::to_string(it->first) + "}";
 
         if (std::next(it) != g_typenames_mapping.end())
         {
             new_value += ", ";
+            new_value_reverse += ", ";
         }
     }
     size_t pos = tmp.find("!!!/* JCC_TYPENAMES_MAPPING */!!!");
     if (pos != std::string::npos)
     {
         tmp.replace(pos, 33, new_value);
+    }
+    size_t pos_reverse = tmp.find("!!!/* JCC_TYPENAMES_MAPPING_REVERSE */!!!", pos);
+
+    if (pos_reverse != std::string::npos)
+    {
+        tmp.replace(pos_reverse, 41, new_value_reverse);
+    }
+
+    std::string reflective_entries;
+
+    for (auto it = g_reflective_entries.begin(); it != g_reflective_entries.end(); ++it)
+    {
+        reflective_entries += "{" + std::to_string(it->first) + ", {";
+
+        for (size_t i = 0; i < it->second.size(); i++)
+        {
+            reflective_entries += "{\"" + it->second[i].field_name + "\", \"" + it->second[i].type + "\", " + std::to_string(it->second[i].count) + "}";
+
+            if (i != it->second.size() - 1)
+            {
+                reflective_entries += ", ";
+            }
+        }
+
+        reflective_entries += "}}";
+
+        if (std::next(it) != g_reflective_entries.end())
+        {
+            reflective_entries += ", ";
+        }
+    }
+
+    pos = tmp.find("!!!/* JCC_REFLECTIVE_ENTRIES */!!!");
+    if (pos != std::string::npos)
+    {
+        tmp.replace(pos, 34, reflective_entries);
     }
 
     output_cxx_stream << "namespace _j {\n";

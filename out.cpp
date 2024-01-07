@@ -1,6 +1,6 @@
 //==================================================================//
 // Type: J++ Transpiled Code                                        //
-// Date: Fri Jan 27 01:10:34 4461273 HST                               //
+// Date: Fri Nov  8 18:21:00 3005252 HST                               //
 //==================================================================//
 
 #include <cstdint>
@@ -72,7 +72,16 @@ namespace _j {
     /* Begin Generic Structure Base Class */
     typedef _jxx::qword typeid_t;
 
-    static std::map<typeid_t, _jxx::string> g_typenames_mapping = {{0, "_uuid_t"}};
+    static std::map<typeid_t, _jxx::string> g_typenames_mapping = {{0, "_uuid_t"}, {1, "_database_record_t"}, {2, "_database_t"}};
+    static std::map<_jxx::string, typeid_t> g_typenames_mapping_reverse = {{"_uuid_t", 0}, {"_database_record_t", 1}, {"_database_t", 2}};
+    static std::map<std::string, uint> g_builtin_sizes = {{"bit", 1}, {"byte", 1}, {"char", 1}, {"word", 2}, {"short", 2}, {"dword", 4}, {"int", 4}, {"float", 4}, {"double", 8}, {"qword", 8}, {"long", 8}, {"string", 8}, {"buffer", 8}, {"routine", 8}, {"address", 8}};
+    struct ReflectiveEntry {
+        _jxx::string field_name;
+        _jxx::string type;
+        _jxx::uintn count;
+    };
+
+    static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {{0, {{"_a", "dword", 1}, {"_b", "word", 1}, {"_c", "word", 1}, {"_d", "word", 1}, {"_e", "dword", 1}, {"_f", "word", 1}}}, {1, {{"_id", "_uuid_t", 1}, {"_name", "string", 1}, {"_age", "byte", 1}, {"_height", "float", 1}, {"_weight", "float", 1}, {"_is_married", "bit", 1}}}, {2, {{"_records", "_database_record_t", 10}}}};
 
     template <typeid_t T>
     class StructGeneric
@@ -82,22 +91,22 @@ namespace _j {
         static std::map<typeid_t, std::map<_jxx::string, const void *>> m_attributes;
 
     public:
-        typeid_t _typeid()
+        inline typeid_t _typeid() const
         {
             return m_typeid;
         }
 
-        _jxx::string _typename()
+        inline _jxx::string _typename() const
         {
-            return g_typenames_mapping[m_typeid];
+            return g_typenames_mapping.at(m_typeid);
         }
 
-        bool _has(_jxx::string name)
+        inline bool _has(_jxx::string name) const
         {
-            return m_attributes[m_typeid].find(name) != m_attributes[m_typeid].end();
+            return m_attributes.at(m_typeid).find(name) != m_attributes.at(m_typeid).end();
         }
 
-        bool _hasfield(_jxx::string name)
+        bool _hasfield(_jxx::string name) const
         {
             _jxx::string index_names = this->_get("_index_names");
             int state = 0;
@@ -112,7 +121,7 @@ namespace _j {
                     continue;
                 }
 
-                if (strcmp(index_names, name) == 0)
+                if (strncmp(index_names, name, strlen(name)) == 0)
                 {
                     return true;
                 }
@@ -123,28 +132,57 @@ namespace _j {
             return false;
         }
 
-        void _set(_jxx::string name, _jxx::string value)
-        {
-            m_attributes[m_typeid][name] = value;
-        }
-
-        void _set(_jxx::string name, long value)
+        inline void _set(_jxx::string name, _jxx::string value) const
         {
             m_attributes[m_typeid][name] = (void *)value;
         }
 
-        _jxx::string _get(_jxx::string name)
+        inline void _set(_jxx::string name, long value) const
         {
-            if (!this->_has(name))
-                _panic("meta _get() failed: Attribute not found");
-            return (_jxx::string)m_attributes[m_typeid][name];
+            m_attributes[m_typeid][name] = (void *)value;
         }
 
-        long _getint(_jxx::string name)
+        inline _jxx::string _get(_jxx::string name) const
         {
-            if (!this->_has(name))
-                _panic("meta _getint() failed: Attribute not found");
-            return (_jxx::qword)m_attributes[m_typeid][name];
+            return (_jxx::string)m_attributes.at(m_typeid).at(name);
+        }
+
+        inline long _getint(_jxx::string name) const
+        {
+            return (_jxx::qword)m_attributes.at(m_typeid).at(name);
+        }
+
+        static inline _jxx::string _gettypename(typeid_t type)
+        {
+            return g_typenames_mapping.at(type);
+        }
+
+        static inline typeid_t _gettypeid(_jxx::string name)
+        {
+            return g_typenames_mapping_reverse.at(name);
+        }
+
+        static size_t _sizeof(typeid_t id)
+        {
+            size_t size = 0;
+            for (auto &field_type : g_reflective_entries.at(id))
+            {
+                if (g_builtin_sizes.contains(field_type.type))
+                {
+                    size += g_builtin_sizes.at(field_type.type) * field_type.count;
+                }
+                else
+                {
+                    size += _sizeof(_gettypeid(field_type.type)) * field_type.count;
+                }
+            }
+
+            return size;
+        }
+
+        inline size_t _sizeof() const
+        {
+            return _sizeof(m_typeid);
         }
     };
 
@@ -156,7 +194,7 @@ namespace _j {
 };
 
 //==================================================================//
-// File: /tmp/file4Q0jx0.cpp                                        //
+// File: /tmp/filevOJgpT.cpp                                        //
 //==================================================================//
 
 namespace _jxx
@@ -197,25 +235,9 @@ namespace _jxx
             this->_set("_f__endian", "big");
 
             /* auto-generated attributes */
-            this->_set("_index", "_a:dword=0,_b:word=0,_c:word=0,_d:word=0,_e:dword=0,_f:word=0");
-            this->_set("_index_names", "_a,_b,_c,_d,_e,_f");
-            this->_set("_index_types", "dword=0,word=0,word=0,word=0,dword=0,word=0");
-        }
-
-        _uuid_t _new(const string& _uuidString)
-        {
-        }
-
-        _uuid_t _copy(const _uuid_t& _uuid)
-        {
-        }
-
-        string _toString()
-        {
-        }
-
-        int _cmp(const _uuid_t& _other)
-        {
+            this->_set("_index", "_a:dword=0,_b:word=0,_c:word=0,_d:word=0,_e:dword=0,_f:word=0,");
+            this->_set("_index_names", "_a,_b,_c,_d,_e,_f,");
+            this->_set("_index_types", "dword=0,word=0,word=0,word=0,dword=0,word=0,");
         }
 
         dword _a = 0;
@@ -229,11 +251,49 @@ namespace _jxx
     constexpr auto j__uuid_t_size = sizeof(_uuid_t);
     /* End Structure _uuid_t */
 
-    void _hello(const _uuid_t& _id, const vector<string>& _name);
-    
+    /* Begin Structure _database_record_t */
+    class _database_record_t : public _j::StructGeneric<1>
+    {
+    public:
+        _database_record_t()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_id:_uuid_t,_name:string,_age:byte,_height:float,_weight:float,_is_married:bit,");
+            this->_set("_index_names", "_id,_name,_age,_height,_weight,_is_married,");
+            this->_set("_index_types", "_uuid_t,string,byte,float,float,bit,");
+        }
+
+        _uuid_t _id;
+        string _name;
+        byte _age;
+        float _height;
+        float _weight;
+        bit _is_married;
+    };
+    constexpr auto j__database_record_t_size = sizeof(_database_record_t);
+    /* End Structure _database_record_t */
+
+    /* Begin Structure _database_t */
+    #pragma pack(push, 1)
+    class _database_t : public _j::StructGeneric<2>
+    {
+    public:
+        _database_t()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_records:vector<_database_record_t>,");
+            this->_set("_index_names", "_records,");
+            this->_set("_index_types", "vector<_database_record_t>,");
+        }
+
+        _database_record_t _records[10];
+    };
+    #pragma pack(pop)
+    constexpr auto j__database_t_size = sizeof(_database_t);
+    /* End Structure _database_t */
+
     int _main()
     {
-        printf("Hello, world!\n")
         return 0;
     }
 
@@ -241,7 +301,7 @@ namespace _jxx
 
 
 //==================================================================//
-// EOF: /tmp/file4Q0jx0.cpp                                         //
+// EOF: /tmp/filevOJgpT.cpp                                         //
 //==================================================================//
 
 
@@ -253,5 +313,5 @@ int main(int argc, char **argv)
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// 9fe8dbe67847b9cf7569ab244a1c0a14cb3a0e6e1e0d85cec90c7eb31a0cfbf0 //
+// af9de765da4c977f490c78afdb4ecb570c0fcfaf8746984998cd453eaf11040e //
 //==================================================================//
