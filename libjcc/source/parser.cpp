@@ -499,6 +499,10 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
         case TokenType::Whitespace:
             tokens.pop();
             break; // skip comments and whitespace
+        case TokenType::Raw:
+            block->push(std::make_shared<RawNode>(std::get<std::string>(curtok.value())));
+            tokens.pop();
+            break;
         case TokenType::Unknown:
             panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
             break;

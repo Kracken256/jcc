@@ -25,6 +25,7 @@ static std::map<jcc::TokenType, std::string> tokenTypeMap = {
     {jcc::TokenType::MultiLineComment, "multiline_comment"},
     {jcc::TokenType::SingleLineComment, "singleline_comment"},
     {jcc::TokenType::Whitespace, "whitespace"},
+    {jcc::TokenType::Raw, "raw"},
 };
 
 jcc::Token::Token()
@@ -80,6 +81,9 @@ std::string jcc::Token::to_string() const
         break;
     case TokenType::Whitespace:
         return std::string("Whitespace(" + std::get<std::string>(m_value) + ")");
+        break;
+    case TokenType::Raw:
+        return std::string("Raw(\"" + std::get<std::string>(m_value) + "\")");
         break;
     default:
         return std::string("Unknown()");
@@ -183,6 +187,9 @@ std::string jcc::TokenList::to_json() const
         case TokenType::Whitespace:
             dataString = std::get<std::string>(m_tokens[i].value());
             break;
+        case TokenType::Raw:
+            dataString = std::get<std::string>(m_tokens[i].value());
+            break;
         default:
             break;
         }
@@ -280,7 +287,8 @@ enum class LexerState
     Identifier,
     Operator,
     Punctuator,
-    Whitespace
+    Whitespace,
+    Raw
 };
 
 enum class LexerStateModifier
@@ -749,6 +757,12 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                 continue;
             }
 
+            if (current_char == '`')
+            {
+                state = LexerState::Raw;
+                continue;
+            }
+
             // invalid state
             throw LexerExceptionUnexpected("Unexpected token at line " + std::to_string(line) + ", column " + std::to_string(column) + ": '" + current_char + "': '" + current_token + "'");
 
@@ -1060,6 +1074,22 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                 break;
             }
 
+            break;
+        case LexerState::Raw:
+            if (current_char == '`')
+            {
+                if (!current_token.empty())
+                {
+                    result.push_back(Token(TokenType::Raw, current_token));
+                    current_token.clear();
+                    state = LexerState::Default;
+                    break;
+                }
+            }
+            else
+            {
+                current_token += current_char;
+            }
             break;
 
         default:

@@ -201,94 +201,82 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
     indent += INDENT_SIZE;
 
-    bool has_attributes = false;
-
-    for (const auto &field : structdef->fields())
+    result += mkpadding(indent) + structdef->name() + "()\n" + mkpadding(indent) + "{\n";
+    indent += INDENT_SIZE;
+    for (size_t i = 0; i < structdef->fields().size(); i++)
     {
-        if (!field->attributes().empty())
+        auto field = structdef->fields()[i];
+
+        if (field->attributes().size() == 0)
         {
-            has_attributes = true;
-            break;
+            continue;
+        }
+
+        result += mkpadding(indent) + "/* attributes for field " + field->name() + " */\n";
+
+        for (const auto &attribute : field->attributes())
+        {
+            result += mkpadding(indent) + "this->_set(\"" + field->name() + "_" + attribute->name() + "\", " + attribute->value() + ");\n";
+        }
+
+        result += "\n";
+    }
+
+    result += mkpadding(indent) + "/* auto-generated attributes */\n";
+    std::map<std::string, std::string> auto_attributes;
+
+    // index_names attribute contains list of all fields
+    // index_types attribute contains list of all fields types
+    // index
+    std::string index_names;
+    std::string index_types;
+    std::string index;
+    for (size_t i = 0; i < structdef->fields().size(); i++)
+    {
+        auto field = structdef->fields()[i];
+
+        std::string typetmp;
+
+        index_names += field->name();
+        if (field->arr_size() > 0)
+        {
+            typetmp = "vector<" + field->type() + ">";
+        }
+        else
+        {
+            typetmp += field->type();
+            if (field->bitfield() > 0)
+            {
+                typetmp += ":" + std::to_string(field->bitfield());
+            }
+        }
+        if (!field->default_value().empty())
+        {
+            typetmp += "=" + field->default_value();
+        }
+
+        index += field->name() + ":" + typetmp;
+        index_types += typetmp;
+        if (i != structdef->fields().size() - 1)
+        {
+            index_names += ",";
+            index_types += ",";
+            index += ",";
         }
     }
 
-    if (has_attributes)
+    auto_attributes.insert({"_index_names", "\"" + index_names + "\""});
+    auto_attributes.insert({"_index_types", "\"" + index_types + "\""});
+    auto_attributes.insert({"_index", "\"" + index + "\""});
+
+    for (const auto &attr : auto_attributes)
     {
-        result += mkpadding(indent) + structdef->name() + "()\n" + mkpadding(indent) + "{\n";
-        indent += INDENT_SIZE;
-        for (size_t i = 0; i < structdef->fields().size(); i++)
-        {
-            auto field = structdef->fields()[i];
-
-            result += mkpadding(indent) + "/* attributes for field " + field->name() + " */\n";
-
-            for (const auto &attribute : field->attributes())
-            {
-                result += mkpadding(indent) + "this->_set(\"" + field->name() + "_" + attribute->name() + "\", " + attribute->value() + ");\n";
-            }
-
-            if (i != structdef->fields().size() - 1)
-            {
-                result += "\n";
-            }
-        }
-
-        result += "\n" + mkpadding(indent) + "/* auto-generated attributes */\n";
-        std::map<std::string, std::string> auto_attributes;
-
-        // index_names attribute contains list of all fields
-        // index_types attribute contains list of all fields types
-        // index
-        std::string index_names;
-        std::string index_types;
-        std::string index;
-        for (size_t i = 0; i < structdef->fields().size(); i++)
-        {
-            auto field = structdef->fields()[i];
-
-            std::string typetmp;
-
-            index_names += field->name();
-            if (field->arr_size() > 0)
-            {
-                typetmp = "vector<" + field->type() + ">";
-            }
-            else
-            {
-                typetmp += field->type();
-                if (field->bitfield() > 0)
-                {
-                    typetmp += ":" + std::to_string(field->bitfield());
-                }
-            }
-            if (!field->default_value().empty())
-            {
-                typetmp += "=" + field->default_value();
-            }
-
-            index += field->name() + ":" + typetmp;
-            index_types += typetmp;
-            if (i != structdef->fields().size() - 1)
-            {
-                index_names += ",";
-                index_types += ",";
-                index += ",";
-            }
-        }
-
-        auto_attributes.insert({"_index_names", "\"" + index_names + "\""});
-        auto_attributes.insert({"_index_types", "\"" + index_types + "\""});
-        auto_attributes.insert({"_index", "\"" + index + "\""});
-
-        for (const auto &attr : auto_attributes)
-        {
-            result += mkpadding(indent) + "this->_set(\"" + attr.first + "\", " + attr.second + ");\n";
-        }
-
-        indent -= INDENT_SIZE;
-
-        result += mkpadding(indent) + "}\n\n";
+        result += mkpadding(indent) + "this->_set(\"" + attr.first + "\", " + attr.second + ");\n";
     }
+
+    indent -= INDENT_SIZE;
+
+    result += mkpadding(indent) + "}\n\n";
 
     for (const auto &field : structdef->fields())
     {
@@ -466,6 +454,8 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return std::static_pointer_cast<FloatingPointLiteralExpression>(node)->value();
     case NodeType::BooleanLiteralExpression:
         return std::static_pointer_cast<BooleanLiteralExpression>(node)->value();
+    case NodeType::RawNode:
+        return mkpadding(indent) + std::static_pointer_cast<RawNode>(node)->value() + "\n";
 
     default:
         throw std::runtime_error("Unknown node type");
@@ -492,6 +482,9 @@ const std::string typedef_commons = R"(#include <cstdint>
 #include <vector>
 #include <string>
 #include <map>
+#include <cstring>
+#include <iostream>
+#include <cstdlib>
 
 namespace _jxx {
     typedef bool bit;
@@ -511,7 +504,45 @@ namespace _jxx {
     using std::vector;
 };)";
 
-const std::string structure_generic_baseclass = R"(    /* Begin Generic Structure Base Class */
+const std::string structure_generic_baseclass = R"(    /* Begin Common Sink functions */
+
+#ifdef __linux__
+#include <execinfo.h>
+
+    [[noreturn]] void _panic(_jxx::string message)
+    {
+        std::cerr << "PANIC: " << message << std::endl;
+
+        void *array[10];
+        size_t size;
+        char **strings;
+
+        size = backtrace(array, 10);
+        strings = backtrace_symbols(array, size);
+
+        std::cerr << "Begin Backtrace:" << std::endl;
+        for (size_t i = 0; i < size; i++)
+        {
+            std::cerr << strings[i] << std::endl;
+        }
+        std::cerr << "End Backtrace" << std::endl;
+
+        // Don't free strings, just leak it
+
+        std::_Exit(1);
+    }  
+#else
+    [[noreturn]] void _panic(_jxx::string message)
+    {
+        std::cerr << "PANIC: " << message << std::endl;
+        abort();
+
+        while (true) {}
+    }  
+#endif
+    
+    
+    /* Begin Generic Structure Base Class */
     typedef _jxx::qword typeid_t;
 
     static std::map<typeid_t, _jxx::string> g_typenames_mapping = {!!!/* JCC_TYPENAMES_MAPPING */!!!};
@@ -531,14 +562,38 @@ const std::string structure_generic_baseclass = R"(    /* Begin Generic Structur
 
         _jxx::string _typename()
         {
-            if (g_typenames_mapping.find(m_typeid) == g_typenames_mapping.end())
-                return "";
             return g_typenames_mapping[m_typeid];
         }
 
         bool _has(_jxx::string name)
         {
             return m_attributes[m_typeid].find(name) != m_attributes[m_typeid].end();
+        }
+
+        bool _hasfield(_jxx::string name)
+        {
+            _jxx::string index_names = this->_get("_index_names");
+            int state = 0;
+
+            while (*index_names)
+            {
+                // ',' reset
+                if (*index_names == ',')
+                {
+                    state = 0;
+                    index_names++;
+                    continue;
+                }
+
+                if (strcmp(index_names, name) == 0)
+                {
+                    return true;
+                }
+
+                index_names++;
+            }
+
+            return false;
         }
 
         void _set(_jxx::string name, _jxx::string value)
@@ -554,14 +609,14 @@ const std::string structure_generic_baseclass = R"(    /* Begin Generic Structur
         _jxx::string _get(_jxx::string name)
         {
             if (!this->_has(name))
-                return "";
+                _panic("meta _get() failed: Attribute not found");
             return (_jxx::string)m_attributes[m_typeid][name];
         }
 
         long _getint(_jxx::string name)
         {
             if (!this->_has(name))
-                return 0;
+                _panic("meta _getint() failed: Attribute not found");
             return (_jxx::qword)m_attributes[m_typeid][name];
         }
     };

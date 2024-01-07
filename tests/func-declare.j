@@ -28,5 +28,6 @@ struct uuid_t {
 }
 
 func main(): int {
+    `printf("Hello, World!\n");`
     return 0
 }

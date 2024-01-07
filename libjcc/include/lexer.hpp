@@ -22,6 +22,7 @@ namespace jcc
         Punctuator,
         MultiLineComment,
         SingleLineComment,
+        Raw,
         Whitespace,
     };
 

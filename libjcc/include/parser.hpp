@@ -25,6 +25,11 @@ namespace jcc
         Block,
 
         ///===================
+        /// Other
+        ///===================
+        RawNode,
+
+        ///===================
         /// Declarations
         ///===================
 
@@ -90,6 +95,23 @@ namespace jcc
         NodeType m_type;
 
         std::string json_escape(const std::string &str) const;
+    };
+
+    class RawNode : public GenericNode
+    {
+    public:
+        RawNode(NodeType type = NodeType::RawNode) : GenericNode(type) {}
+        RawNode(const std::string &value, NodeType type = NodeType::RawNode) : GenericNode(type), m_value(value) {}
+        virtual ~RawNode() {}
+
+        const std::string &value() const { return m_value; }
+        std::string &value() { return m_value; }
+
+        std::string to_string() const override { return "RawNode(" + m_value + ")"; }
+        std::string to_json() const override { return "{\"type\":\"raw_node\",\"value\":\"" + json_escape(m_value) + "\"}"; }
+
+    protected:
+        std::string m_value;
     };
 
     class Expression : public GenericNode

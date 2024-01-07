@@ -1,6 +1,6 @@
 //==================================================================//
 // Type: J++ Transpiled Code                                        //
-// Date: Sun May 18 12:58:06 4461681 HST                               //
+// Date: Thu Apr 12 08:17:34 4461545 HST                               //
 //==================================================================//
 
 #include <cstdint>
@@ -8,6 +8,9 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cstring>
+#include <iostream>
+#include <cstdlib>
 
 namespace _jxx {
     typedef bool bit;
@@ -28,6 +31,44 @@ namespace _jxx {
 };
 
 namespace _j {
+    /* Begin Common Sink functions */
+
+#ifdef __linux__
+#include <execinfo.h>
+
+    [[noreturn]] void _panic(_jxx::string message)
+    {
+        std::cerr << "PANIC: " << message << std::endl;
+
+        void *array[10];
+        size_t size;
+        char **strings;
+
+        size = backtrace(array, 10);
+        strings = backtrace_symbols(array, size);
+
+        std::cerr << "Begin Backtrace:" << std::endl;
+        for (size_t i = 0; i < size; i++)
+        {
+            std::cerr << strings[i] << std::endl;
+        }
+        std::cerr << "End Backtrace" << std::endl;
+
+        // Don't free strings, just leak it
+
+        std::_Exit(1);
+    }  
+#else
+    [[noreturn]] void _panic(_jxx::string message)
+    {
+        std::cerr << "PANIC: " << message << std::endl;
+        abort();
+
+        while (true) {}
+    }  
+#endif
+    
+    
     /* Begin Generic Structure Base Class */
     typedef _jxx::qword typeid_t;
 
@@ -48,14 +89,38 @@ namespace _j {
 
         _jxx::string _typename()
         {
-            if (g_typenames_mapping.find(m_typeid) == g_typenames_mapping.end())
-                return "";
             return g_typenames_mapping[m_typeid];
         }
 
         bool _has(_jxx::string name)
         {
             return m_attributes[m_typeid].find(name) != m_attributes[m_typeid].end();
+        }
+
+        bool _hasfield(_jxx::string name)
+        {
+            _jxx::string index_names = this->_get("_index_names");
+            int state = 0;
+
+            while (*index_names)
+            {
+                // ',' reset
+                if (*index_names == ',')
+                {
+                    state = 0;
+                    index_names++;
+                    continue;
+                }
+
+                if (strcmp(index_names, name) == 0)
+                {
+                    return true;
+                }
+
+                index_names++;
+            }
+
+            return false;
         }
 
         void _set(_jxx::string name, _jxx::string value)
@@ -71,14 +136,14 @@ namespace _j {
         _jxx::string _get(_jxx::string name)
         {
             if (!this->_has(name))
-                return "";
+                _panic("meta _get() failed: Attribute not found");
             return (_jxx::string)m_attributes[m_typeid][name];
         }
 
         long _getint(_jxx::string name)
         {
             if (!this->_has(name))
-                return 0;
+                _panic("meta _getint() failed: Attribute not found");
             return (_jxx::qword)m_attributes[m_typeid][name];
         }
     };
@@ -91,7 +156,7 @@ namespace _j {
 };
 
 //==================================================================//
-// File: /tmp/filetjiW1G.cpp                                        //
+// File: /tmp/fileRez0gk.cpp                                        //
 //==================================================================//
 
 namespace _jxx
@@ -146,8 +211,14 @@ namespace _jxx
     constexpr auto j__uuid_t_size = sizeof(_uuid_t);
     /* End Structure _uuid_t */
 
+    
+#define UUID_SIZE 36
+
     int _main()
     {
+        char uuid[UUID_SIZE];
+        printf("Hello, world!\n");
+        printf("UUID_SIZE: %d\n", UUID_SIZE);
         return 0;
     }
 
@@ -155,7 +226,7 @@ namespace _jxx
 
 
 //==================================================================//
-// EOF: /tmp/filetjiW1G.cpp                                         //
+// EOF: /tmp/fileRez0gk.cpp                                         //
 //==================================================================//
 
 
@@ -167,5 +238,5 @@ int main(int argc, char **argv)
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// c86ea2b9ff13a4e3c3668335ade46466ec865db15746c4912f7f4f209b1ff0bd //
+// c5024914e4ddfefa47df515ab0ed056d6a7dc7012f6f3371ca7bb3652175d3a2 //
 //==================================================================//
