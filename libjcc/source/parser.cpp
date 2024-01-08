@@ -689,7 +689,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                 attribute->value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
                 break;
             case TokenType::NumberLiteral:
-                attribute->value() = std::to_string(std::get<uint64_t>(curtok.value()));
+                attribute->value() = std::get<std::string>(curtok.value());
                 break;
             default:
                 break;
@@ -885,7 +885,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                     return false;
                 }
 
-                field->arr_size() = std::get<uint64_t>(curtok.value());
+                field->arr_size() = std::stoi(std::get<std::string>(curtok.value()));
                 tokens.pop();
 
                 if (tokens.eof())
@@ -933,7 +933,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                     return false;
                 }
 
-                field->bitfield() = std::get<uint64_t>(curtok.value());
+                field->bitfield() = std::stoi(std::get<std::string>(curtok.value()));
                 tokens.pop();
             }
 
@@ -968,7 +968,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                     field->default_value() = "\"" + std::get<std::string>(curtok.value()) + "\"";
                     break;
                 case TokenType::NumberLiteral:
-                    field->default_value() = std::to_string(std::get<uint64_t>(curtok.value()));
+                    field->default_value() = std::get<std::string>(curtok.value());
                     break;
                 case TokenType::FloatingPointLiteral:
                     field->default_value() = std::get<std::string>(curtok.value());
@@ -1204,7 +1204,7 @@ bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std
             curtok = tokens.peek();
             if (curtok.type() == TokenType::NumberLiteral)
             {
-                parameter->arr_size() = std::get<uint64_t>(curtok.value());
+                parameter->arr_size() = std::stoi(std::get<std::string>(curtok.value()));
                 tokens.pop();
                 if (tokens.eof())
                 {
@@ -1256,7 +1256,7 @@ bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std
                 parameter->default_value() = std::make_shared<StringLiteralExpression>(std::get<std::string>(curtok.value()));
                 break;
             case TokenType::NumberLiteral:
-                parameter->default_value() = std::make_shared<IntegerLiteralExpression>(std::to_string(std::get<uint64_t>(curtok.value())));
+                parameter->default_value() = std::make_shared<IntegerLiteralExpression>(std::get<std::string>(curtok.value()));
                 break;
             case TokenType::FloatingPointLiteral:
                 parameter->default_value() = std::make_shared<FloatingPointLiteralExpression>(std::get<std::string>(curtok.value()));
@@ -1411,7 +1411,7 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
             curtok = tokens.peek();
             if (curtok.type() == TokenType::NumberLiteral)
             {
-                return_arr_size = std::get<uint64_t>(curtok.value());
+                return_arr_size = std::stoi(std::get<std::string>(curtok.value()));
                 tokens.pop();
                 if (tokens.eof())
                 {
@@ -1575,7 +1575,7 @@ bool jcc::CompilationUnit::parse_expression_helper(jcc::TokenList &tokens, jcc::
 {
     /// TODO: implement this
     (void)tokens;
-    output = ExpNode(Token(TokenType::NumberLiteral, (uint64_t)0), {});
+    output = ExpNode(Token(TokenType::NumberLiteral, ""), {});
 
     tokens.pop();
 
@@ -1587,7 +1587,7 @@ bool jcc::CompilationUnit::parse_expression(jcc::TokenList &tokens, std::shared_
     ExpNode output;
     parse_expression_helper(tokens, output);
 
-    auto item = std::make_shared<LiteralExpression>(std::to_string(std::get<uint64_t>(output.value.value())));
+    auto item = std::make_shared<LiteralExpression>(std::get<std::string>(output.value.value()));
 
     node = std::static_pointer_cast<GenericNode>(item);
 

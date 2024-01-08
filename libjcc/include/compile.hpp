@@ -238,7 +238,8 @@ namespace jcc
 
         bool parse_struct_keyword(TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed = false);
 
-        enum class FunctionParseMode {
+        enum class FunctionParseMode
+        {
             DeclarationOnly,
             DefinitionOnly,
             DeclarationOrDefinition,
@@ -271,7 +272,7 @@ namespace jcc
                     str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
                     break;
                 case jcc::TokenType::NumberLiteral:
-                    str += std::to_string(std::get<uint64_t>(value.value()));
+                    str += std::get<std::string>(value.value());
                     break;
                 case jcc::TokenType::StringLiteral:
                     str += std::get<std::string>(value.value());
@@ -281,6 +282,9 @@ namespace jcc
                     break;
                 case jcc::TokenType::Punctuator:
                     str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
+                    break;
+                case jcc::TokenType::FloatingPointLiteral:
+                    str += std::get<std::string>(value.value());
                     break;
                 default:
                     str += "Unknown";

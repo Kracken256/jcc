@@ -25,6 +25,6 @@ namespace ns_2 {
 }
 
 
-func hello (a:float = 2.491847018e10.23) {
+func hello (a:float = 2.491847018e10.23,b:int=10) {
 
 }

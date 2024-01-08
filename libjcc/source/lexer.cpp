@@ -63,7 +63,7 @@ std::string jcc::Token::to_string() const
         return std::string("Keyword(" + std::string(lexKeywordMapReverse.at(std::get<Keyword>(m_value))) + ")");
         break;
     case TokenType::NumberLiteral:
-        return std::string("NumberLiteral(" + std::to_string(std::get<uint64_t>(m_value)) + ")");
+        return std::string("NumberLiteral(" + std::get<std::string>(m_value) + ")");
         break;
     case TokenType::FloatingPointLiteral:
         return std::string("FloatingPointLiteral(" + std::get<std::string>(m_value) + ")");
@@ -168,7 +168,7 @@ std::string jcc::TokenList::to_json() const
             dataString = std::string(lexKeywordMapReverse.at(std::get<Keyword>(token.value())));
             break;
         case TokenType::NumberLiteral:
-            dataString = std::to_string(std::get<uint64_t>(token.value()));
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::FloatingPointLiteral:
             dataString = std::get<std::string>(token.value());
@@ -490,7 +490,7 @@ static std::string normalize_float(const std::string &input)
     return ss.str();
 }
 
-uint64_t normalize_number_literal(std::string &number, size_t column, size_t line)
+std::string normalize_number_literal(std::string &number, size_t column, size_t line)
 {
     uint64_t x = 0;
 
@@ -565,7 +565,7 @@ uint64_t normalize_number_literal(std::string &number, size_t column, size_t lin
     }
 
     /// TODO: Verify correctness of literal normalization
-    return x;
+    return std::to_string(x);
 }
 
 /// @brief Lex the source code into a list of tokens

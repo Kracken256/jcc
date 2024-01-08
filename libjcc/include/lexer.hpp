@@ -466,7 +466,7 @@ namespace jcc
         {jcc::Operator::Not, "!"},
         {jcc::Operator::Ternary, "?"}};
 
-    typedef std::variant<std::string, uint64_t, Operator, Keyword, Punctuator>
+    typedef std::variant<std::string, Operator, Keyword, Punctuator>
         TokenValueType;
 
     class Token
