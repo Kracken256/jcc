@@ -1,30 +1,29 @@
-struct struct_A {
-    a: int
+func SayHi(name: string = "God") {
+    print("Hello \(name)!")
+
+    // use `var` to declare a thread-safe variable
+    var counter = 0
+    var callbacks: bit[3]
+
+    go func() {
+        // create a new routine
+        print("Hello \(name), \(counter++)!")
+    }().then(callbacks[0]=true)
+
+    go func() {
+        // create a new routine 
+        print("Hello \(name), \(counter++)!")
+    }().then(callbacks[1]=true)
+
+    go func() {
+        // create a new routine
+        print("Hello \(name), \(counter++)!")
+    }().then(callbacks[2]=true)
+
+    // wait for all routines to finish
+    wait(callbacks.every(x => x))
 }
 
-namespace ns_1 {
-    struct struct_B {
-        b: int
-    }
-}
-
-namespace ns_2 {
-    struct struct_C {
-        a: struct_A
-        b: ns_1::struct_B
-    }
-
-    namespace ns_3 {
-        struct struct_D {
-            a: struct_C
-            b: struct_A
-            c: ns_1::struct_B
-        }
-    
-    }
-}
-
-
-func hello (a:float = 2.491847018e10.23,b:int=10) {
-
+export func Main() {
+    SayHi("User")
 }

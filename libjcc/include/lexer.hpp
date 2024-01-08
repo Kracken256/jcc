@@ -28,44 +28,48 @@ namespace jcc
 
     enum class Keyword
     {
+        // Namespaces
         Namemap,
         Namespace,
-        Using,
+
+        // Symbols import/export
+        Import,
         Export,
-        Global,
+        Extern,
+
         Infer,
-        Seal,
-        Unseal,
-        Class,
+
+        // Composites
         Struct,
         Region,
-        Func,
         Union,
+
+        // Functions
+        Func,
+
+        // Modifiers
         Typedef,
+        Const,
+        Ref,
+        Static,
+        Volatile,
+
+        // Object-oriented
+        Class,
         Public,
         Private,
         Protected,
+        Override,
         Claim,
         Virtual,
         Abstract,
-        Volatile,
-        Const,
-        Ref,
-        Enum,
-        Static_map,
-        Explicit,
-        Extern,
         Friend,
-        Operator,
-        This,
-        Constructor,
-        Destructor,
-        Metaclass,
-        Metatype,
-        Metafunction,
+        Subsystem,
+        Interface,
+
         Meta,
-        Static,
-        Sizeof,
+
+        // Control flow
         If,
         Else,
         For,
@@ -73,7 +77,6 @@ namespace jcc
         Do,
         Switch,
         Return,
-        Fault,
         Case,
         Break,
         Default,
@@ -81,6 +84,10 @@ namespace jcc
         Throw,
         Continue,
 
+        // Enumeration
+        Enum,
+
+        // Types
         Bit,
         Char,
         Byte,
@@ -113,42 +120,39 @@ namespace jcc
     const std::map<const char *, jcc::Keyword> lexKeywordMap = {
         {"namemap", jcc::Keyword::Namemap},
         {"namespace", jcc::Keyword::Namespace},
-        {"using", jcc::Keyword::Using},
+
+        {"import", jcc::Keyword::Import},
         {"export", jcc::Keyword::Export},
-        {"global", jcc::Keyword::Global},
+        {"extern", jcc::Keyword::Extern},
+
         {"infer", jcc::Keyword::Infer},
-        {"seal", jcc::Keyword::Seal},
-        {"unseal", jcc::Keyword::Unseal},
-        {"class", jcc::Keyword::Class},
+
         {"struct", jcc::Keyword::Struct},
         {"region", jcc::Keyword::Region},
-        {"func", jcc::Keyword::Func},
         {"union", jcc::Keyword::Union},
+
+        {"func", jcc::Keyword::Func},
+
         {"typedef", jcc::Keyword::Typedef},
+        {"const", jcc::Keyword::Const},
+        {"ref", jcc::Keyword::Ref},
+        {"static", jcc::Keyword::Static},
+        {"volatile", jcc::Keyword::Volatile},
+
+        {"class", jcc::Keyword::Class},
         {"public", jcc::Keyword::Public},
         {"private", jcc::Keyword::Private},
         {"protected", jcc::Keyword::Protected},
+        {"override", jcc::Keyword::Override},
         {"claim", jcc::Keyword::Claim},
         {"virtual", jcc::Keyword::Virtual},
         {"abstract", jcc::Keyword::Abstract},
-        {"volatile", jcc::Keyword::Volatile},
-        {"const", jcc::Keyword::Const},
-        {"ref", jcc::Keyword::Ref},
-        {"enum", jcc::Keyword::Enum},
-        {"static_map", jcc::Keyword::Static_map},
-        {"explicit", jcc::Keyword::Explicit},
-        {"extern", jcc::Keyword::Extern},
         {"friend", jcc::Keyword::Friend},
-        {"operator", jcc::Keyword::Operator},
-        {"this", jcc::Keyword::This},
-        {"constructor", jcc::Keyword::Constructor},
-        {"destructor", jcc::Keyword::Destructor},
-        {"metaclass", jcc::Keyword::Metaclass},
-        {"metatype", jcc::Keyword::Metatype},
-        {"metafunction", jcc::Keyword::Metafunction},
+        {"subsystem", jcc::Keyword::Subsystem},
+        {"interface", jcc::Keyword::Interface},
+
         {"meta", jcc::Keyword::Meta},
-        {"static", jcc::Keyword::Static},
-        {"sizeof", jcc::Keyword::Sizeof},
+
         {"if", jcc::Keyword::If},
         {"else", jcc::Keyword::Else},
         {"for", jcc::Keyword::For},
@@ -156,13 +160,14 @@ namespace jcc
         {"do", jcc::Keyword::Do},
         {"switch", jcc::Keyword::Switch},
         {"return", jcc::Keyword::Return},
-        {"fault", jcc::Keyword::Fault},
         {"case", jcc::Keyword::Case},
         {"break", jcc::Keyword::Break},
         {"default", jcc::Keyword::Default},
         {"abort", jcc::Keyword::Abort},
         {"throw", jcc::Keyword::Throw},
         {"continue", jcc::Keyword::Continue},
+
+        {"enum", jcc::Keyword::Enum},
 
         {"bit", jcc::Keyword::Bit},
         {"char", jcc::Keyword::Char},
@@ -195,42 +200,39 @@ namespace jcc
     const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
         {jcc::Keyword::Namemap, "namemap"},
         {jcc::Keyword::Namespace, "namespace"},
-        {jcc::Keyword::Using, "using"},
+
+        {jcc::Keyword::Import, "import"},
         {jcc::Keyword::Export, "export"},
-        {jcc::Keyword::Global, "global"},
+        {jcc::Keyword::Extern, "extern"},
+        
         {jcc::Keyword::Infer, "infer"},
-        {jcc::Keyword::Seal, "seal"},
-        {jcc::Keyword::Unseal, "unseal"},
-        {jcc::Keyword::Class, "class"},
+        
         {jcc::Keyword::Struct, "struct"},
         {jcc::Keyword::Region, "region"},
-        {jcc::Keyword::Func, "func"},
         {jcc::Keyword::Union, "union"},
+
+        {jcc::Keyword::Func, "func"},
+        
         {jcc::Keyword::Typedef, "typedef"},
+        {jcc::Keyword::Const, "const"},
+        {jcc::Keyword::Ref, "ref"},
+        {jcc::Keyword::Static, "static"},
+        {jcc::Keyword::Volatile, "volatile"},
+
+        {jcc::Keyword::Class, "class"},
         {jcc::Keyword::Public, "public"},
         {jcc::Keyword::Private, "private"},
         {jcc::Keyword::Protected, "protected"},
+        {jcc::Keyword::Override, "override"},
         {jcc::Keyword::Claim, "claim"},
         {jcc::Keyword::Virtual, "virtual"},
         {jcc::Keyword::Abstract, "abstract"},
-        {jcc::Keyword::Volatile, "volatile"},
-        {jcc::Keyword::Const, "const"},
-        {jcc::Keyword::Ref, "ref"},
-        {jcc::Keyword::Enum, "enum"},
-        {jcc::Keyword::Static_map, "static_map"},
-        {jcc::Keyword::Explicit, "explicit"},
-        {jcc::Keyword::Extern, "extern"},
         {jcc::Keyword::Friend, "friend"},
-        {jcc::Keyword::Operator, "operator"},
-        {jcc::Keyword::This, "this"},
-        {jcc::Keyword::Constructor, "constructor"},
-        {jcc::Keyword::Destructor, "destructor"},
-        {jcc::Keyword::Metaclass, "metaclass"},
-        {jcc::Keyword::Metatype, "metatype"},
-        {jcc::Keyword::Metafunction, "metafunction"},
+        {jcc::Keyword::Subsystem, "subsystem"},
+        {jcc::Keyword::Interface, "interface"},
+
         {jcc::Keyword::Meta, "meta"},
-        {jcc::Keyword::Static, "static"},
-        {jcc::Keyword::Sizeof, "sizeof"},
+
         {jcc::Keyword::If, "if"},
         {jcc::Keyword::Else, "else"},
         {jcc::Keyword::For, "for"},
@@ -238,13 +240,14 @@ namespace jcc
         {jcc::Keyword::Do, "do"},
         {jcc::Keyword::Switch, "switch"},
         {jcc::Keyword::Return, "return"},
-        {jcc::Keyword::Fault, "fault"},
         {jcc::Keyword::Case, "case"},
         {jcc::Keyword::Break, "break"},
         {jcc::Keyword::Default, "default"},
         {jcc::Keyword::Abort, "abort"},
         {jcc::Keyword::Throw, "throw"},
         {jcc::Keyword::Continue, "continue"},
+
+        {jcc::Keyword::Enum, "enum"},
 
         {jcc::Keyword::Bit, "bit"},
         {jcc::Keyword::Char, "char"},
@@ -273,7 +276,6 @@ namespace jcc
         {jcc::Keyword::Tensor, "tensor"},
         {jcc::Keyword::Void, "void"},
         {jcc::Keyword::Null, "null"}};
-
 
     enum class Punctuator
     {

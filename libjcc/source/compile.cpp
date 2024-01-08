@@ -22,6 +22,9 @@
 #error "Cross-platform support is not implemented yet"
 #endif
 
+static std::vector<std::shared_ptr<jcc::CompilerMessage>> g_messages;
+static std::mutex g_messages_mutex;
+
 ///=============================================================================
 /// jcc::CompilerMessage class implementation
 ///=============================================================================
@@ -120,7 +123,7 @@ std::string jcc::CompilerMessage::message() const
         part3 = "Info: ";
         break;
     default:
-        panic("CompilerMessage::message(): Unknown message type", {});
+        panic("CompilerMessage::message(): Unknown message type");
     }
 
     part4 = this->m_message;
@@ -161,7 +164,7 @@ std::string jcc::CompilerMessage::ansi_message() const
         part3 = "\x1b[36;49;1mInfo:\x1b[0m ";
         break;
     default:
-        panic("CompilerMessage::ansi_message(): Unknown message type", {});
+        panic("CompilerMessage::ansi_message(): Unknown message type");
     }
 
     part4 = this->m_message;
@@ -265,7 +268,6 @@ jcc::CompilationUnit::CompilationUnit()
     m_output_file = "a.out";
     m_cxx_temp_files = {};
     m_obj_temp_files = {};
-    m_messages = {};
     m_success = false;
 }
 
@@ -325,14 +327,16 @@ const std::string &jcc::CompilationUnit::output_file() const
 
 const std::vector<std::shared_ptr<jcc::CompilerMessage>> &jcc::CompilationUnit::messages() const
 {
-    return m_messages;
+    std::lock_guard<std::mutex> lock(g_messages_mutex);
+    return g_messages;
 }
 
 std::vector<jcc::CompilerWarning> jcc::CompilationUnit::warnings() const
 {
     std::vector<jcc::CompilerWarning> warnings;
+    std::lock_guard<std::mutex> lock(g_messages_mutex);
 
-    for (const auto &message : this->m_messages)
+    for (const auto &message : g_messages)
     {
         if (message->type() == CompilerMessageType::Warning)
         {
@@ -346,8 +350,9 @@ std::vector<jcc::CompilerWarning> jcc::CompilationUnit::warnings() const
 std::vector<jcc::CompilerError> jcc::CompilationUnit::errors() const
 {
     std::vector<jcc::CompilerError> errors;
+    std::lock_guard<std::mutex> lock(g_messages_mutex);
 
-    for (const auto &message : this->m_messages)
+    for (const auto &message : g_messages)
     {
         if (message->type() == CompilerMessageType::Error)
         {
@@ -361,8 +366,9 @@ std::vector<jcc::CompilerError> jcc::CompilationUnit::errors() const
 std::vector<jcc::CompilerInfo> jcc::CompilationUnit::infos() const
 {
     std::vector<jcc::CompilerInfo> infos;
+    std::lock_guard<std::mutex> lock(g_messages_mutex);
 
-    for (const auto &message : this->m_messages)
+    for (const auto &message : g_messages)
     {
         if (message->type() == CompilerMessageType::Info)
         {
@@ -440,7 +446,6 @@ void jcc::CompilationUnit::reset_instance()
     this->m_current_file = 0;
     this->m_cxx_temp_files.clear();
     this->m_obj_temp_files.clear();
-    this->m_messages.clear();
     this->m_success = false;
 }
 
@@ -752,7 +757,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     catch (const std::exception &e)
     {
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Preprocessor::preprocess(" + std::string(e.what()) + ")");
-        panic("Caught unexpected exception in Preprocessor::preprocess()", this->m_messages);
+        panic("Caught unexpected exception in Preprocessor::preprocess()");
         return false;
     }
 
@@ -774,7 +779,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     catch (const std::exception &e)
     {
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Lexer::lex(" + std::string(e.what()) + ")");
-        panic("Caught unexpected exception in Lexer::lex()", this->m_messages);
+        panic("Caught unexpected exception in Lexer::lex()");
         return false;
     }
 
@@ -807,7 +812,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     catch (const std::exception &e)
     {
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Parser::parse(" + std::string(e.what()) + ")");
-        panic("Caught unexpected exception in Parser::parse()", this->m_messages);
+        panic("Caught unexpected exception in Parser::parse()");
         return false;
     }
 
@@ -830,7 +835,7 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
     catch (const std::exception &e)
     {
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Generator::generate(" + std::string(e.what()) + ")");
-        panic("Caught unexpected exception in Generator::generate()", this->m_messages);
+        panic("Caught unexpected exception in Generator::generate()");
         return false;
     }
 
@@ -871,7 +876,9 @@ void jcc::CompilationUnit::push_message(jcc::CompilerMessageType type, const std
         fname = file;
     }
 
-    this->m_messages.push_back(std::make_shared<jcc::CompilerMessage>(message, fname, line, column, type));
+    g_messages_mutex.lock();
+    g_messages.push_back(std::make_shared<jcc::CompilerMessage>(message, fname, line, column, type));
+    g_messages_mutex.unlock();
 }
 
 ///=============================================================================
@@ -1087,7 +1094,7 @@ static void print_stacktrace()
 }
 #endif
 
-void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::CompilerMessage>> messages)
+void jcc::panic(const std::string &message)
 {
     static std::atomic<bool> panic_called = false;
 
@@ -1104,9 +1111,11 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
 
     panic_called = true;
 
+    g_messages_mutex.lock();
+
     std::stringstream autoreport_id;
 
-    if (messages.size() > 5)
+    if (g_messages.size() > 5)
     {
         std::cerr << "\r\n\x1b[31;49;1m[\x1b[0m \x1b[31;49;1;4mINTERNAL COMPILER ERROR\x1b[0m \x1b[31;49;1m]\x1b[0m: \x1b[36;49;1m" << message << "\x1b[0m\n"
                   << std::endl;
@@ -1119,7 +1128,7 @@ void jcc::panic(const std::string &message, std::vector<std::shared_ptr<jcc::Com
     std::cerr << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
               << std::endl;
 
-    for (const auto &message : messages)
+    for (const auto &message : g_messages)
     {
         std::cerr << message->ansi_message() << std::endl;
 

@@ -9,6 +9,108 @@
 ///=============================================================================
 /// Common
 ///=============================================================================
+namespace jcc
+{
+
+    enum class FunctionParseMode
+    {
+        DeclarationOnly,
+        DefinitionOnly,
+        DeclarationOrDefinition,
+    };
+
+    struct ExpNode
+    {
+        jcc::Token value;
+        std::vector<ExpNode> children;
+        ExpNode() = default;
+        ExpNode(const jcc::Token &value, const std::vector<ExpNode> &children) : value(value), children(children) {}
+
+        std::string print_tree(const ExpNode node, const std::string prefix, bool is_tail, std::string str) const
+        {
+            str += prefix + (is_tail ? "└── " : "├── ");
+            switch (node.value.type())
+            {
+            case jcc::TokenType::Identifier:
+                str += std::get<std::string>(value.value());
+                break;
+            case jcc::TokenType::Operator:
+                str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
+                break;
+            case jcc::TokenType::NumberLiteral:
+                str += std::get<std::string>(value.value());
+                break;
+            case jcc::TokenType::StringLiteral:
+                str += std::get<std::string>(value.value());
+                break;
+            case jcc::TokenType::Keyword:
+                str += lexKeywordMapReverse.at(std::get<jcc::Keyword>(value.value()));
+                break;
+            case jcc::TokenType::Punctuator:
+                str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
+                break;
+            case jcc::TokenType::FloatingPointLiteral:
+                str += std::get<std::string>(value.value());
+                break;
+            default:
+                str += "Unknown";
+                break;
+            }
+            str += "\n";
+            for (size_t i = 0; i < node.children.size(); i++)
+            {
+                str = print_tree(node.children[i], prefix + (is_tail ? "    " : "│   "), i == node.children.size() - 1, str);
+            }
+            return str;
+        }
+
+        std::string to_string() const
+        {
+            // std::string str = "Node(";
+            // switch (value.type())
+            // {
+            // case jcc::TokenType::Identifier:
+            //     str += std::get<std::string>(value.value());
+            //     break;
+            // case jcc::TokenType::Operator:
+            //     str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
+            //     break;
+            // case jcc::TokenType::NumberLiteral:
+            //     str += std::to_string(std::get<uint64_t>(value.value()));
+            //     break;
+            // case jcc::TokenType::StringLiteral:
+            //     str += std::get<std::string>(value.value());
+            //     break;
+            // case jcc::TokenType::Keyword:
+            //     str += std::get<std::string>(value.value());
+            //     break;
+            // case jcc::TokenType::Punctuator:
+            //     str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
+            //     break;
+            // default:
+            //     break;
+            // }
+            // str += ", [";
+            // for (const auto &child : children)
+            // {
+            //     str += child.to_string() + ", ";
+            // }
+
+            // if (children.size() > 0)
+            // {
+            //     str.pop_back();
+            //     str.pop_back();
+            // }
+
+            // str += "])";
+
+            // return str;
+
+            return print_tree(*this, "", true, "");
+        }
+    };
+
+}
 
 static bool is_builtin_type(const std::string &type)
 {
@@ -408,8 +510,23 @@ std::string jcc::CallExpression::to_json() const
 /// Parser
 ///=============================================================================
 
-bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+namespace jcc
 {
+
+    static bool parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
+    static bool parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params);
+    static bool parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::FunctionParseMode mode = jcc::FunctionParseMode::DeclarationOrDefinition);
+    static bool parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_expression_helper(jcc::TokenList &tokens, jcc::ExpNode &output);
+}
+
+static bool jcc::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    using namespace jcc;
+
     if (tokens.size() < 2)
     {
         throw SyntaxError("Expected punctuator on block");
@@ -522,11 +639,8 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
             block->push(std::make_shared<RawNode>(std::get<std::string>(curtok.value())));
             tokens.pop();
             break;
-        case TokenType::Unknown:
-            panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
-            break;
         default:
-            panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
+            panic("Unknown token type: " + std::to_string((int)curtok.type()));
             break;
         }
     }
@@ -552,16 +666,10 @@ bool jcc::CompilationUnit::parse_block(jcc::TokenList &tokens, std::shared_ptr<j
     return true;
 }
 
-void h(int x)
+static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
 {
-    if (x == 0)
-        return;
+    using namespace jcc;
 
-    h(x--);
-}
-
-bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
-{
     if (tokens.size() < 3)
     {
         throw SyntaxError("Expected identifier after struct keyword");
@@ -1001,16 +1109,13 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
 
     node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields, functions, packed);
 
-    if (fields.empty())
-    {
-        push_message(CompilerMessageType::Warning, "Empty structure was defined. This is is undefined behavior.");
-    }
-
     return true;
 }
 
-bool jcc::CompilationUnit::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
+    using namespace jcc;
+
     if (tokens.size() < 3)
     {
         throw SyntaxError("Expected identifier after namespace keyword");
@@ -1059,8 +1164,10 @@ bool jcc::CompilationUnit::parse_namespace_keyword(jcc::TokenList &tokens, std::
     return true;
 }
 
-bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params)
+static bool jcc::parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params)
 {
+    using namespace jcc;
+
     if (tokens.size() < 2)
     {
         throw SyntaxError("Expected closing parenthesis in function parameters");
@@ -1181,7 +1288,7 @@ bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std
                 }
                 break;
             default:
-                panic("Unknown token type: " + std::to_string((int)curtok.type()), m_messages);
+                panic("Unknown token type: " + std::to_string((int)curtok.type()));
                 break;
             }
         }
@@ -1308,7 +1415,7 @@ bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std
     return true;
 }
 
-bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::CompilationUnit::FunctionParseMode mode)
+static bool jcc::parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::FunctionParseMode mode)
 {
     // func name ([[name:type[=default]]...]) [-> return_type] [block]
 
@@ -1493,7 +1600,7 @@ bool jcc::CompilationUnit::parse_func_keyword(jcc::TokenList &tokens, std::share
     return true;
 }
 
-bool jcc::CompilationUnit::parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+static bool jcc::parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     if (tokens.size() < 1)
     {
@@ -1571,7 +1678,7 @@ std::map<std::string, uint32_t> operator_precedence = {
     // Add other custom operators here with their respective precedence
 };
 
-bool jcc::CompilationUnit::parse_expression_helper(jcc::TokenList &tokens, jcc::CompilationUnit::ExpNode &output)
+static bool jcc::parse_expression_helper(jcc::TokenList &tokens, jcc::ExpNode &output)
 {
     /// TODO: implement this
     (void)tokens;
@@ -1582,7 +1689,7 @@ bool jcc::CompilationUnit::parse_expression_helper(jcc::TokenList &tokens, jcc::
     return true;
 }
 
-bool jcc::CompilationUnit::parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+static bool jcc::parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     ExpNode output;
     parse_expression_helper(tokens, output);

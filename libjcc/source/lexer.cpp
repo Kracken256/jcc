@@ -244,7 +244,7 @@ void jcc::TokenList::pop(size_t count)
 {
     if (count > m_tokens.size())
     {
-        panic("Unable to pop from TokenList, count is greater than size", {});
+        panic("Unable to pop from TokenList, count is greater than size");
     }
 
     m_tokens.pop_back();
@@ -263,7 +263,7 @@ const jcc::Token &jcc::TokenList::peek(size_t index) const
 {
     if (index >= m_tokens.size())
     {
-        panic("Unable to peek TokenList, index out of bounds", {});
+        panic("Unable to peek TokenList, index out of bounds");
     }
 
     return m_tokens[m_tokens.size() - index - 1];

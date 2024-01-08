@@ -665,7 +665,7 @@ std::string jcc::CompilationUnit::generate(const std::shared_ptr<jcc::AbstractSy
 
     if (target != TargetLanguage::CXX)
     {
-        panic("Unsupported target language", m_messages);
+        panic("Unsupported target language");
     }
 
     result += generate_node_cxx(ast->root(), indent, current_namespace);
