@@ -82,21 +82,20 @@ namespace jcc
         Continue,
 
         Bit,
-        Byte,
         Char,
-        Word,
+        Byte,
         Short,
-        Dword,
+        Word,
         Int,
-        Qword,
+        Dword,
         Long,
+        Qword,
         Float,
         Double,
-        Nint,
-        Nuint,
         Intn,
         Uintn,
         Address,
+        Routine,
         Bigfloat,
         Bigint,
         Biguint,
@@ -105,12 +104,8 @@ namespace jcc
         Real,
         Complex,
         String,
-        Buffer,
-        Secbuffer,
-        Secstring,
         Map,
         Tensor,
-        Routine,
         Void,
         Null,
     };
@@ -170,21 +165,20 @@ namespace jcc
         {"continue", jcc::Keyword::Continue},
 
         {"bit", jcc::Keyword::Bit},
-        {"byte", jcc::Keyword::Byte},
         {"char", jcc::Keyword::Char},
-        {"word", jcc::Keyword::Word},
+        {"byte", jcc::Keyword::Byte},
         {"short", jcc::Keyword::Short},
-        {"dword", jcc::Keyword::Dword},
+        {"word", jcc::Keyword::Word},
         {"int", jcc::Keyword::Int},
-        {"qword", jcc::Keyword::Qword},
+        {"dword", jcc::Keyword::Dword},
         {"long", jcc::Keyword::Long},
+        {"qword", jcc::Keyword::Qword},
         {"float", jcc::Keyword::Float},
         {"double", jcc::Keyword::Double},
-        {"nint", jcc::Keyword::Nint},
-        {"nuint", jcc::Keyword::Nuint},
         {"intn", jcc::Keyword::Intn},
         {"uintn", jcc::Keyword::Uintn},
         {"address", jcc::Keyword::Address},
+        {"routine", jcc::Keyword::Routine},
         {"bigfloat", jcc::Keyword::Bigfloat},
         {"bigint", jcc::Keyword::Bigint},
         {"biguint", jcc::Keyword::Biguint},
@@ -193,12 +187,8 @@ namespace jcc
         {"real", jcc::Keyword::Real},
         {"complex", jcc::Keyword::Complex},
         {"string", jcc::Keyword::String},
-        {"buffer", jcc::Keyword::Buffer},
-        {"secbuffer", jcc::Keyword::Secbuffer},
-        {"secstring", jcc::Keyword::Secstring},
         {"map", jcc::Keyword::Map},
         {"tensor", jcc::Keyword::Tensor},
-        {"routine", jcc::Keyword::Routine},
         {"void", jcc::Keyword::Void},
         {"null", jcc::Keyword::Null}};
 
@@ -257,21 +247,20 @@ namespace jcc
         {jcc::Keyword::Continue, "continue"},
 
         {jcc::Keyword::Bit, "bit"},
-        {jcc::Keyword::Byte, "byte"},
         {jcc::Keyword::Char, "char"},
-        {jcc::Keyword::Word, "word"},
+        {jcc::Keyword::Byte, "byte"},
         {jcc::Keyword::Short, "short"},
-        {jcc::Keyword::Dword, "dword"},
+        {jcc::Keyword::Word, "word"},
         {jcc::Keyword::Int, "int"},
-        {jcc::Keyword::Qword, "qword"},
+        {jcc::Keyword::Dword, "dword"},
         {jcc::Keyword::Long, "long"},
+        {jcc::Keyword::Qword, "qword"},
         {jcc::Keyword::Float, "float"},
         {jcc::Keyword::Double, "double"},
-        {jcc::Keyword::Nint, "nint"},
-        {jcc::Keyword::Nuint, "nuint"},
         {jcc::Keyword::Intn, "intn"},
         {jcc::Keyword::Uintn, "uintn"},
         {jcc::Keyword::Address, "address"},
+        {jcc::Keyword::Routine, "routine"},
         {jcc::Keyword::Bigfloat, "bigfloat"},
         {jcc::Keyword::Bigint, "bigint"},
         {jcc::Keyword::Biguint, "biguint"},
@@ -280,14 +269,11 @@ namespace jcc
         {jcc::Keyword::Real, "real"},
         {jcc::Keyword::Complex, "complex"},
         {jcc::Keyword::String, "string"},
-        {jcc::Keyword::Buffer, "buffer"},
-        {jcc::Keyword::Secbuffer, "secbuffer"},
-        {jcc::Keyword::Secstring, "secstring"},
         {jcc::Keyword::Map, "map"},
         {jcc::Keyword::Tensor, "tensor"},
-        {jcc::Keyword::Routine, "routine"},
         {jcc::Keyword::Void, "void"},
         {jcc::Keyword::Null, "null"}};
+
 
     enum class Punctuator
     {
@@ -380,8 +366,6 @@ namespace jcc
         Not,
 
         Ternary,
-        Preprocessor,
-        MemberAccess,
     };
 
     const std::map<const char *, jcc::Operator> lexOperatorMap = {
@@ -431,9 +415,7 @@ namespace jcc
         {"~", jcc::Operator::BitwiseNot},
         {"!", jcc::Operator::Not},
 
-        {"?", jcc::Operator::Ternary},
-        {"#", jcc::Operator::Preprocessor},
-        {".", jcc::Operator::MemberAccess}};
+        {"?", jcc::Operator::Ternary}};
 
     const std::map<jcc::Operator, const char *> lexOperatorMapReverse = {
         {jcc::Operator::PlusEquals, "+="},
@@ -482,11 +464,9 @@ namespace jcc
         {jcc::Operator::BitwiseXor, "^"},
         {jcc::Operator::BitwiseNot, "~"},
         {jcc::Operator::Not, "!"},
-        {jcc::Operator::Ternary, "?"},
-        {jcc::Operator::Preprocessor, "#"},
-        {jcc::Operator::MemberAccess, "."}};
+        {jcc::Operator::Ternary, "?"}};
 
-    typedef std::variant<std::string, uint64_t, double, Operator, Keyword, Punctuator>
+    typedef std::variant<std::string, uint64_t, Operator, Keyword, Punctuator>
         TokenValueType;
 
     class Token
@@ -515,6 +495,8 @@ namespace jcc
 
         TokenType m_type;
         TokenValueType m_value;
+
+        bool operator==(const Token &other) const;
     };
 
     class TokenList

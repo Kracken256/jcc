@@ -8,6 +8,9 @@
 #include <regex>
 #include <sstream>
 #include <cmath>
+#include <iomanip>
+
+#define FLOATING_POINT_LITERAL_ROUND_DIGITS 32
 
 ///=============================================================================
 /// jcc::Token class implementation
@@ -63,7 +66,7 @@ std::string jcc::Token::to_string() const
         return std::string("NumberLiteral(" + std::to_string(std::get<uint64_t>(m_value)) + ")");
         break;
     case TokenType::FloatingPointLiteral:
-        return std::string("FloatingPointLiteral(" + std::to_string(std::get<double>(m_value)) + ")");
+        return std::string("FloatingPointLiteral(" + std::get<std::string>(m_value) + ")");
     case TokenType::StringLiteral:
         return std::string("StringLiteral(\"" + std::get<std::string>(m_value) + "\")");
         break;
@@ -80,7 +83,7 @@ std::string jcc::Token::to_string() const
         return std::string("MultiLineComment(\"" + std::get<std::string>(m_value) + "\")");
         break;
     case TokenType::Whitespace:
-        return std::string("Whitespace(" + std::get<std::string>(m_value) + ")");
+        return std::string("Whitespace()");
         break;
     case TokenType::Raw:
         return std::string("Raw(\"" + std::get<std::string>(m_value) + "\")");
@@ -89,6 +92,11 @@ std::string jcc::Token::to_string() const
         return std::string("Unknown()");
         break;
     }
+}
+
+bool jcc::Token::operator==(const jcc::Token &other) const
+{
+    return this->m_type == other.m_type && this->m_value == other.m_value;
 }
 
 ///=============================================================================
@@ -140,55 +148,48 @@ std::string jcc::TokenList::to_string() const
 std::string jcc::TokenList::to_json() const
 {
     std::string result = "[";
-    for (size_t i = m_tokens.size(); i > 0; i--)
+    for (auto it = m_tokens.rbegin(); it != m_tokens.rend(); ++it)
     {
-        if (m_tokens[i].type() == TokenType::Whitespace || m_tokens[i].type() == TokenType::SingleLineComment || m_tokens[i].type() == TokenType::MultiLineComment)
+        const auto &token = *it;
+        std::string dataString = "", escapedString = "";
+        if (token.type() == TokenType::Whitespace)
         {
-            if (i == m_tokens.size() - 1)
-            {
-                return result.substr(0, result.length() - 1) + "]";
-            }
             continue;
         }
-
-        std::string dataString = "", escapedString = "";
         result += "{";
-        result += "\"t\":\"" + tokenTypeMap[static_cast<jcc::TokenType>(m_tokens[i].type())] + "\",";
+        result += "\"t\":\"" + tokenTypeMap[static_cast<jcc::TokenType>(token.type())] + "\",";
 
-        switch (m_tokens[i].type())
+        switch (token.type())
         {
         case TokenType::Identifier:
-            dataString = std::get<std::string>(m_tokens[i].value());
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::Keyword:
-            dataString = std::string(lexKeywordMapReverse.at(std::get<Keyword>(m_tokens[i].value())));
+            dataString = std::string(lexKeywordMapReverse.at(std::get<Keyword>(token.value())));
             break;
         case TokenType::NumberLiteral:
-            dataString = std::to_string(std::get<uint64_t>(m_tokens[i].value()));
+            dataString = std::to_string(std::get<uint64_t>(token.value()));
             break;
         case TokenType::FloatingPointLiteral:
-            dataString = std::to_string(std::get<double>(m_tokens[i].value()));
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::StringLiteral:
-            dataString = std::get<std::string>(m_tokens[i].value());
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::Operator:
-            dataString = std::string(lexOperatorMapReverse.at(std::get<Operator>(m_tokens[i].value())));
+            dataString = std::string(lexOperatorMapReverse.at(std::get<Operator>(token.value())));
             break;
         case TokenType::Punctuator:
-            dataString = std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(m_tokens[i].value())));
+            dataString = std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(token.value())));
             break;
         case TokenType::SingleLineComment:
-            dataString = std::get<std::string>(m_tokens[i].value());
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::MultiLineComment:
-            dataString = std::get<std::string>(m_tokens[i].value());
-            break;
-        case TokenType::Whitespace:
-            dataString = std::get<std::string>(m_tokens[i].value());
+            dataString = std::get<std::string>(token.value());
             break;
         case TokenType::Raw:
-            dataString = std::get<std::string>(m_tokens[i].value());
+            dataString = std::get<std::string>(token.value());
             break;
         default:
             break;
@@ -226,9 +227,9 @@ std::string jcc::TokenList::to_json() const
 
         result += "}";
 
-        if (i != m_tokens.size() - 1)
+        if (it + 1 != m_tokens.rend())
         {
-            result += ",";
+            result += ", ";
         }
     }
     return result + "]";
@@ -310,6 +311,7 @@ static std::vector<std::pair<const char *, unsigned int>> lexPunctuators = {
     {",", 1},  // comma
     {"::", 2}, // scope resolution
     {":", 1},  // colon
+    {".", 1},  // dot
 };
 
 static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
@@ -359,12 +361,10 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"~", 1},  // bitwise not
     {"!", 1},  // not
 
-    {"?", 1},      // ternary
-    {"#", 1},      // preprocessor
-    {".", 1},      // member access
+    {"?", 1}, // ternary
 };
 
-static const char lexIdentifierChars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+static const char lexIdentifierChars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_:";
 static const size_t lexIdentifierCharsLength = (sizeof(lexIdentifierChars) - 1) / sizeof(char);
 
 enum class NumberLiteralType
@@ -461,10 +461,33 @@ test_float:
     // slow operation
     if (std::regex_match(input, regexpFloat))
     {
+        std::cout << "Floating point number literal detected:" << input << std::endl;
         return NumberLiteralType::Floating;
     }
 
     return NumberLiteralType::Invalid;
+}
+
+static std::string normalize_float(const std::string &input)
+{
+    double mantissa = 0;
+    double exponent = 0;
+    double x = 0;
+
+    size_t e_pos = input.find('e');
+
+    if (e_pos == std::string::npos)
+    {
+        return input;
+    }
+
+    mantissa = std::stod(input.substr(0, e_pos));
+    exponent = std::stod(input.substr(e_pos + 1));
+
+    x = mantissa * std::pow(10.0, exponent);
+    std::stringstream ss;
+    ss << std::setprecision(FLOATING_POINT_LITERAL_ROUND_DIGITS) << x;
+    return ss.str();
 }
 
 uint64_t normalize_number_literal(std::string &number, size_t column, size_t line)
@@ -536,10 +559,6 @@ uint64_t normalize_number_literal(std::string &number, size_t column, size_t lin
         break;
     case NumberLiteralType::Decimal:
         x = std::stoull(number);
-        break;
-    case NumberLiteralType::Floating:
-        /// TODO: Implement floating point number literal normalization
-        throw jcc::LexerExceptionInvalidLiteral("Floating point number literal not valid at line " + std::to_string(line) + ", column " + std::to_string(column) + ". Floating point literals are not supported yet.");
         break;
     default:
         break;
@@ -734,7 +753,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
             // Check for identifier
             if (!std::isdigit(current_char))
             {
-                if (std::isalpha(current_char) || current_char == '_')
+                if (std::isalpha(current_char) || current_char == '_' || current_char == ':')
                 {
                     state = LexerState::Identifier;
                     continue;
@@ -865,7 +884,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
         case LexerState::NumberLiteral:
             if ((current_token.empty() || current_token.size() == 1))
             {
-                if (!std::isdigit(current_char) && current_char != 'b' && current_char != 'o' && current_char != 'x' && current_char != 'd')
+                if (!std::isdigit(current_char) && (current_char != 'b' && current_char != 'o' && current_char != 'x' && current_char != 'd' && current_char != '.'))
                 {
                     if (current_token.size() > 1)
                     {
@@ -997,7 +1016,14 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
             break;
 
         finish_number_literal:
-            result.push_back(Token(TokenType::NumberLiteral, normalize_number_literal(current_token, column, line)));
+            if (current_token.find('.') != std::string::npos || current_token.find('e') != std::string::npos)
+            {
+                result.push_back(Token(TokenType::FloatingPointLiteral, normalize_float(current_token)));
+            }
+            else
+            {
+                result.push_back(Token(TokenType::NumberLiteral, normalize_number_literal(current_token, column, line)));
+            }
             current_token.clear();
             state = LexerState::Default;
             continue;
@@ -1032,8 +1058,27 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
             }
             break;
         case LexerState::Identifier:
-            if (std::isalnum(current_char) || current_char == '_')
+            if (std::isalnum(current_char) || current_char == '_' || current_char == ':')
             {
+                // look ahead and see if the next character is a colon
+                if (current_char == ':')
+                {
+                    if ((src_length - i < 2 || source[i + 1] != ':'))
+                    {
+                        result.push_back(Token(TokenType::Identifier, current_token));
+                        current_token.clear();
+                        state = LexerState::Default;
+                        continue;
+                    }
+                    else
+                    {
+                        current_token += "::";
+                        i++;
+                        column++;
+                        break;
+                    }
+                }
+
                 current_token += current_char;
             }
             else

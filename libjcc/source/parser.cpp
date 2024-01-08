@@ -13,7 +13,7 @@
 static bool is_builtin_type(const std::string &type)
 {
     // integers and floating point numbers
-    if (type == "bit" || type == "byte" || type == "char" || type == "word" || type == "short" || type == "dword" || type == "int" || type == "qword" || type == "long" || type == "float" || type == "double" || type == "nint" || type == "nuint" || type == "intn" || type == "uintn")
+    if (type == "bit" || type == "byte" || type == "char" || type == "word" || type == "short" || type == "dword" || type == "int" || type == "qword" || type == "long" || type == "float" || type == "double" || type == "intn" || type == "uintn" || type == "address" || type == "routine")
     {
         return true;
     }
@@ -24,7 +24,7 @@ static bool is_builtin_type(const std::string &type)
     }
 
     // complex types
-    if (type == "address" || type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "buffer" || type == "secbuffer" || type == "secstring" || type == "map" || type == "tensor" || type == "routine")
+    if (type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "map" || type == "tensor")
     {
         return true;
     }
@@ -971,7 +971,7 @@ bool jcc::CompilationUnit::parse_struct_keyword(jcc::TokenList &tokens, std::sha
                     field->default_value() = std::to_string(std::get<uint64_t>(curtok.value()));
                     break;
                 case TokenType::FloatingPointLiteral:
-                    field->default_value() = std::to_string(std::get<double>(curtok.value()));
+                    field->default_value() = std::get<std::string>(curtok.value());
                     break;
                 case TokenType::Identifier:
                     field->default_value() = std::get<std::string>(curtok.value());
@@ -1259,7 +1259,7 @@ bool jcc::CompilationUnit::parse_function_parameters(jcc::TokenList &tokens, std
                 parameter->default_value() = std::make_shared<IntegerLiteralExpression>(std::to_string(std::get<uint64_t>(curtok.value())));
                 break;
             case TokenType::FloatingPointLiteral:
-                parameter->default_value() = std::make_shared<FloatingPointLiteralExpression>(std::to_string(std::get<double>(curtok.value())));
+                parameter->default_value() = std::make_shared<FloatingPointLiteralExpression>(std::get<std::string>(curtok.value()));
                 break;
             case TokenType::Identifier:
             {

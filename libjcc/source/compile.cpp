@@ -776,15 +776,6 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
-    // Prefix all identifiers with '_' to prevent name collisions with C++ keywords
-    for (auto &token : tokens.m_tokens)
-    {
-        if (token.type() == TokenType::Identifier)
-        {
-            std::get<std::string>(token.m_value) = "_" + std::get<std::string>(token.value());
-        }
-    }
-
     std::shared_ptr<AbstractSyntaxTree> ast;
 
     try
