@@ -37,7 +37,4 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     target_include_directories(test-${TEST_NAME} PRIVATE include)
     target_link_libraries(test-${TEST_NAME} PRIVATE -static-libgcc -static-libstdc++ ${CRYPTO_LIB} ${GMP_LIB} )
     target_compile_options(test-${TEST_NAME} PRIVATE -O3 -Wall -Wextra -Wpedantic )
-    add_custom_command(TARGET test-${TEST_NAME} POST_BUILD
-        COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/output/tests
-        COMMAND mv $<TARGET_FILE:test-${TEST_NAME}> ${CMAKE_SOURCE_DIR}/output/tests/${TEST_NAME})
 endforeach()
