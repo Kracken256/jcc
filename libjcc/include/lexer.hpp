@@ -31,6 +31,7 @@ namespace jcc
         // Namespaces
         Namemap,
         Namespace,
+        Subsystem,
 
         // Symbols import/export
         Import,
@@ -38,6 +39,8 @@ namespace jcc
         Extern,
 
         Infer,
+        Let,
+        Var,
 
         // Composites
         Struct,
@@ -64,7 +67,6 @@ namespace jcc
         Virtual,
         Abstract,
         Friend,
-        Subsystem,
         Interface,
 
         Meta,
@@ -120,12 +122,15 @@ namespace jcc
     const std::map<const char *, jcc::Keyword> lexKeywordMap = {
         {"namemap", jcc::Keyword::Namemap},
         {"namespace", jcc::Keyword::Namespace},
+        {"subsystem", jcc::Keyword::Subsystem},
 
         {"import", jcc::Keyword::Import},
         {"export", jcc::Keyword::Export},
         {"extern", jcc::Keyword::Extern},
 
         {"infer", jcc::Keyword::Infer},
+        {"let", jcc::Keyword::Let},
+        {"var", jcc::Keyword::Var},
 
         {"struct", jcc::Keyword::Struct},
         {"region", jcc::Keyword::Region},
@@ -148,7 +153,6 @@ namespace jcc
         {"virtual", jcc::Keyword::Virtual},
         {"abstract", jcc::Keyword::Abstract},
         {"friend", jcc::Keyword::Friend},
-        {"subsystem", jcc::Keyword::Subsystem},
         {"interface", jcc::Keyword::Interface},
 
         {"meta", jcc::Keyword::Meta},
@@ -200,19 +204,22 @@ namespace jcc
     const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
         {jcc::Keyword::Namemap, "namemap"},
         {jcc::Keyword::Namespace, "namespace"},
+        {jcc::Keyword::Subsystem, "subsystem"},
 
         {jcc::Keyword::Import, "import"},
         {jcc::Keyword::Export, "export"},
         {jcc::Keyword::Extern, "extern"},
-        
+
         {jcc::Keyword::Infer, "infer"},
-        
+        {jcc::Keyword::Let, "let"},
+        {jcc::Keyword::Var, "var"},
+
         {jcc::Keyword::Struct, "struct"},
         {jcc::Keyword::Region, "region"},
         {jcc::Keyword::Union, "union"},
 
         {jcc::Keyword::Func, "func"},
-        
+
         {jcc::Keyword::Typedef, "typedef"},
         {jcc::Keyword::Const, "const"},
         {jcc::Keyword::Ref, "ref"},
@@ -228,7 +235,6 @@ namespace jcc
         {jcc::Keyword::Virtual, "virtual"},
         {jcc::Keyword::Abstract, "abstract"},
         {jcc::Keyword::Friend, "friend"},
-        {jcc::Keyword::Subsystem, "subsystem"},
         {jcc::Keyword::Interface, "interface"},
 
         {jcc::Keyword::Meta, "meta"},

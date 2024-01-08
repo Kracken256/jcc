@@ -513,20 +513,31 @@ std::string jcc::CallExpression::to_json() const
 namespace jcc
 {
 
+    static bool parse_union_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
     static bool parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
+    static bool parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_enum_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_typedef_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_subsystem_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params);
-    static bool parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::FunctionParseMode mode = jcc::FunctionParseMode::DeclarationOrDefinition);
+    static bool parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::FunctionParseMode mode);
     static bool parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-    static bool parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool functional);
     static bool parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_expression_helper(jcc::TokenList &tokens, jcc::ExpNode &output);
+    static bool parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_extern_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
 }
 
-static bool jcc::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
-    using namespace jcc;
-
     if (tokens.size() < 2)
     {
         throw SyntaxError("Expected punctuator on block");
@@ -559,33 +570,90 @@ static bool jcc::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::Generi
         case TokenType::Keyword:
             switch (std::get<jcc::Keyword>(curtok.value()))
             {
-            case Keyword::Region:
-                if (!parse_struct_keyword(tokens, tmp, true))
-                    return false;
-                block->push(tmp);
-                break;
-            case Keyword::Struct:
-                if (!parse_struct_keyword(tokens, tmp, false))
-                    return false;
-                block->push(tmp);
-                break;
             case Keyword::Namespace:
                 if (!parse_namespace_keyword(tokens, tmp))
                     return false;
                 block->push(tmp);
                 break;
-            case Keyword::Func:
-                if (!parse_func_keyword(tokens, tmp))
+            case Keyword::Subsystem:
+                if (!parse_subsystem_keyword(tokens, tmp))
                     return false;
                 block->push(tmp);
                 break;
-            case Keyword::Return:
-                if (!parse_return_keyword(tokens, tmp))
+
+            case Keyword::Import:
+                if (!parse_import_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Export:
+                if (!parse_export_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Extern:
+                if (!parse_extern_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Let:
+                if (!parse_let_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Var:
+                if (!parse_var_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Struct:
+                if (!parse_struct_keyword(tokens, tmp, false))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Region:
+                if (!parse_struct_keyword(tokens, tmp, true))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Union:
+                if (!parse_union_keyword(tokens, tmp, false))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Func:
+                if (!parse_func_keyword(tokens, tmp, FunctionParseMode::DeclarationOrDefinition))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Typedef:
+                if (!parse_typedef_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Volatile:
+                if (!parse_volatile_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Class:
+                if (!parse_class_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Enum:
+                if (!parse_enum_keyword(tokens, tmp))
                     return false;
                 block->push(tmp);
                 break;
             default:
-                throw SyntaxError("Unknown keyword: " + std::to_string((int)std::get<jcc::Keyword>(curtok.value())));
+                throw SyntaxError("Unexpected keyword: " + std::string(lexKeywordMapReverse.at(std::get<jcc::Keyword>(curtok.value()))));
             }
             break;
         case TokenType::Punctuator:
@@ -664,6 +732,67 @@ static bool jcc::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::Generi
     node = block;
 
     return true;
+}
+
+static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_extern_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement
+    return false;
+}
+
+static bool jcc::parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool functional)
+{
+    return functional ? parse_functional_block(tokens, node) : parse_structural_block(tokens, node);
 }
 
 static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
@@ -946,7 +1075,7 @@ static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
                 }
 
                 std::shared_ptr<GenericNode> block;
-                if (!parse_block(tokens, block))
+                if (!parse_block(tokens, block, true))
                 {
                     return false;
                 }
@@ -1112,6 +1241,37 @@ static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
     return true;
 }
 
+static bool jcc::parse_union_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
+{
+    (void)tokens;
+    (void)node;
+    (void)packed;
+    /// TODO: implement this
+    return false;
+}
+
+static bool jcc::parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement this
+    return false;
+}
+
+static bool jcc::parse_enum_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    return false;
+}
+
+static bool jcc::parse_typedef_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    return false;
+}
+
 static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     using namespace jcc;
@@ -1154,7 +1314,7 @@ static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr
 
     std::shared_ptr<GenericNode> block = std::make_shared<Block>();
 
-    if (!parse_block(tokens, block))
+    if (!parse_block(tokens, block, false))
     {
         return false;
     }
@@ -1162,6 +1322,14 @@ static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr
     node = std::make_shared<NamespaceDefinition>(std::get<std::string>(next_1.value()), std::static_pointer_cast<Block>(block));
 
     return true;
+}
+
+static bool jcc::parse_subsystem_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    (void)tokens;
+    (void)node;
+    /// TODO: implement this
+    return false;
 }
 
 static bool jcc::parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params)
@@ -1589,7 +1757,7 @@ static bool jcc::parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc:
         }
         std::shared_ptr<GenericNode> block = std::make_shared<Block>();
 
-        if (!parse_block(tokens, block))
+        if (!parse_block(tokens, block, true))
         {
             return false;
         }
@@ -1725,7 +1893,7 @@ std::shared_ptr<jcc::AbstractSyntaxTree> jcc::CompilationUnit::parse(const jcc::
     tokens_copy.m_tokens.insert(tokens_copy.m_tokens.begin(), Token(TokenType::Punctuator, Punctuator::CloseBrace));
     tokens_copy.m_tokens.push_back(Token(TokenType::Punctuator, Punctuator::OpenBrace));
 
-    if (!parse_block(tokens_copy, rootnode))
+    if (!parse_block(tokens_copy, rootnode, false))
     {
         return nullptr;
     }
