@@ -867,7 +867,7 @@ const std::string structure_generic_baseclass = R"(    /* Begin Common Sink func
     const typeid_t StructGeneric<T>::m_typeid;
     /* End Generic Structure Base Class */)";
 
-bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx)
+bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::string, std::string>> &sources, const std::string &output_cxx)
 {
     std::ofstream output_cxx_stream(output_cxx, std::ios::binary);
 
@@ -879,12 +879,52 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
     jcc::crypto::SHA256_CTX sha256_ctx;
     jcc::crypto::sha256_init(sha256_ctx);
 
-    uint32_t _unix_timestamp = ::unix_timestamp();
+    time_t current_time = std::time(nullptr);
+
+    std::string sources_formatted = "// Sources: [";
+    size_t line_width = 10;
+    for (const auto &source : sources)
+    {
+        if (line_width + source.first.size() + 4 > 64)
+        {
+            for (size_t i = 0; i < 64 - line_width; i++)
+            {
+                sources_formatted += " ";
+            }
+            sources_formatted += " //\n// ";
+            line_width = 0;
+        }
+
+        sources_formatted += "\"" + source.first;
+        if (source != sources.back())
+        {
+            sources_formatted += "\", ";
+            line_width += source.first.size() + 4;
+        }
+        else
+        {
+            sources_formatted += "\"";
+            line_width += source.first.size() + 3;
+        }
+    }
+    sources_formatted += "]";
+    for (size_t i = 0; i < 64 - line_width; i++)
+    {
+        sources_formatted += " ";
+    }
+    sources_formatted += " //";
 
     // print header
     output_cxx_stream << "//==================================================================//\n"
-                      << "// Type: J++ Transpiled Code                                        //\n"
-                      << "// Date: " << std::put_time(std::localtime((const time_t *)&_unix_timestamp), "%c %Z") << "                            //\n"
+                      << "// Info: J++ Transpiled Code                                        //\n"
+                      << "// Type: C++-20                                                     //\n"
+                      << "// Version: J++-dev                                                 //\n"
+                      << sources_formatted << "\n"
+                      << "// Platform: "
+                      << "independent"
+                      << "                                            //\n"
+                      << "// Date: " << std::put_time(std::gmtime(&current_time), "%Y-%m-%dT%H:%M:%S %z %Z") << "                              //\n"
+                      << "// Copyright (C) 2023 Wesley C. Jones. All rights reserved.         //\n"
                       << "//==================================================================//\n"
                       << "\n";
 
@@ -955,9 +995,9 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
         output_cxx_stream << "};\n\n";
     }
 
-    for (const auto &file : cxx_files)
+    for (const auto &source : sources)
     {
-        std::ifstream input_cxx_stream(file, std::ios::binary);
+        std::ifstream input_cxx_stream(source.second, std::ios::binary);
 
         if (!input_cxx_stream.is_open())
         {
@@ -965,7 +1005,7 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
             return false;
         }
 
-        std::string fname_padded = file;
+        std::string fname_padded = "\"" + source.first + "\"";
         if (fname_padded.size() > 58)
         {
             fname_padded = "..." + fname_padded.substr(fname_padded.size() - 55);
@@ -976,7 +1016,7 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
         }
 
         output_cxx_stream << "//==================================================================//\n"
-                          << "// File: " << fname_padded << " //\n"
+                          << "// File: \"" << source.first << "\" //\n"
                           << "//==================================================================//\n"
                           << "\n";
 
@@ -994,7 +1034,7 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
                           << "// EOF: " << fname_padded << "  //\n"
                           << "//==================================================================//\n";
 
-        if (file != cxx_files.back())
+        if (source != sources.back())
         {
             output_cxx_stream << "\n";
         }

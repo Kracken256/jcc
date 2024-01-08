@@ -447,8 +447,9 @@ void jcc::CompilationUnit::reset_instance()
 bool jcc::CompilationUnit::build()
 {
     const char *env_jcc_helper, *env_jcc_ld;
-    std::vector<std::string> cxx_flags, cxx_files, ld_flags;
+    std::vector<std::string> cxx_flags, ld_flags;
     std::string cxx_output, objpath;
+    std::vector<std::pair<std::string, std::string>> sources;
 
     this->m_success = false;
 
@@ -480,13 +481,14 @@ bool jcc::CompilationUnit::build()
 
     for (const auto &file : this->m_cxx_temp_files)
     {
-        cxx_files.push_back(file.second);
+        // cxx_files.push_back(file.second);
+        sources.push_back({file.first, file.second});
     }
 
     cxx_output = this->m_output_file + ".cpp";
 
     // produce single C++ file
-    if (!join_to_output_cxx(cxx_files, cxx_output))
+    if (!join_to_output_cxx(sources, cxx_output))
     {
         this->push_message(CompilerMessageType::Error, "Failed to join generated C++ files into output file");
         return false;

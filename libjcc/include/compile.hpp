@@ -186,7 +186,7 @@ namespace jcc
         /// @return Target language source code.
         std::string generate(const std::shared_ptr<AbstractSyntaxTree> &ast, TargetLanguage target = TargetLanguage::CXX);
 
-        static bool join_to_output_cxx(const std::vector<std::string> &cxx_files, const std::string &output_cxx);
+        static bool join_to_output_cxx(const std::vector<std::pair<std::string, std::string>> &sources, const std::string &output_cxx);
 
     private:
         std::vector<std::string> m_files;
