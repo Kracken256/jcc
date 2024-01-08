@@ -884,7 +884,7 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::string> &cx
     // print header
     output_cxx_stream << "//==================================================================//\n"
                       << "// Type: J++ Transpiled Code                                        //\n"
-                      << "// Date: " << std::put_time(std::localtime((const time_t *)&_unix_timestamp), "%c %Z") << "                               //\n"
+                      << "// Date: " << std::put_time(std::localtime((const time_t *)&_unix_timestamp), "%c %Z") << "                            //\n"
                       << "//==================================================================//\n"
                       << "\n";
 
