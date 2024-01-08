@@ -33,11 +33,5 @@ target_link_libraries(jcc PRIVATE ${JCC_LIB} ${CRYPTO_LIB} ${GMP_LIB} )
 if (BUILD_RELEASE MATCHES "on")
     add_custom_command(TARGET jcc POST_BUILD
             COMMAND strip $<TARGET_FILE:jcc>
-            COMMAND upx $<TARGET_FILE:jcc>
-            COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/output
-            COMMAND mv $<TARGET_FILE:jcc> ${CMAKE_SOURCE_DIR}/output/jcc)
-else ()
-    add_custom_command(TARGET jcc POST_BUILD
-            COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/output
-            COMMAND mv $<TARGET_FILE:jcc> ${CMAKE_SOURCE_DIR}/output/jcc)
+            COMMAND upx $<TARGET_FILE:jcc>)
 endif ()
