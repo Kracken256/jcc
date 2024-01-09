@@ -65,9 +65,9 @@ static std::string rectify_type(const std::string &type)
     return string;
 }
 
-static std::string get_qualified_typename(const std::string &name, const std::string &_namespace)
+static std::string get_qualified_typename(const std::string &name, const std::string &_subsystem)
 {
-    return rectify_name(_namespace) + "::" + rectify_name(name);
+    return rectify_name(_subsystem) + "::" + rectify_name(name);
 }
 
 static std::string mkpadding(uint32_t indent)
@@ -82,31 +82,36 @@ static std::string mkpadding(uint32_t indent)
     return result;
 }
 
-static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace);
+static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem);
 
-static std::string generate_block_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_block_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    std::string result = mkpadding(indent) + "{\n";
-
-    indent += INDENT_SIZE;
+    std::string result;
 
     auto block = std::static_pointer_cast<Block>(node);
 
-    for (const auto &child : block->children())
+    if (block->render_braces())
     {
-        result += generate_node_cxx(child, indent, _namespace);
+        result += mkpadding(indent) + "{\n";
+        indent += INDENT_SIZE;
     }
 
-    indent -= INDENT_SIZE;
+    for (const auto &child : block->children())
+    {
+        result += generate_node_cxx(child, indent, _subsystem);
+    }
 
-    result += mkpadding(indent) + "}\n";
-
+    if (block->render_braces())
+    {
+        indent -= INDENT_SIZE;
+        result += mkpadding(indent) + "}\n";
+    }
     return result;
 }
 
-static std::string generate_typedef_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_typedef_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto typedefdef = std::static_pointer_cast<TypeDeclaration>(node);
     std::string result = mkpadding(indent) + "typedef " + rectify_type(typedefdef->type_name()) + " " + rectify_type(typedefdef->alias()) + ";\n";
@@ -114,9 +119,9 @@ static std::string generate_typedef_cxx(const std::shared_ptr<jcc::GenericNode> 
     return result;
 }
 
-static std::string generate_struct_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_struct_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto structdef = std::static_pointer_cast<StructDeclaration>(node);
     std::string result = mkpadding(indent) + "struct " + rectify_name(structdef->name()) + ";\n";
@@ -124,9 +129,9 @@ static std::string generate_struct_declaration_cxx(const std::shared_ptr<jcc::Ge
     return result;
 }
 
-static std::string generate_union_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_union_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto uniondef = std::static_pointer_cast<UnionDeclaration>(node);
     std::string result = mkpadding(indent) + "union " + rectify_name(uniondef->name()) + ";\n";
@@ -134,9 +139,9 @@ static std::string generate_union_declaration_cxx(const std::shared_ptr<jcc::Gen
     return result;
 }
 
-static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto enumdef = std::static_pointer_cast<EnumDeclaration>(node);
     std::string result = mkpadding(indent) + "enum " + rectify_name(enumdef->name()) + ";\n";
@@ -144,7 +149,7 @@ static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::Gene
     return result;
 }
 
-static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto param = std::static_pointer_cast<FunctionParameter>(node);
     std::string result;
@@ -156,7 +161,7 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
             result += "const ";
         }
 
-        result += "vector<" + rectify_type(param->type()) + ">";
+        result += "std::vector<" + rectify_type(param->type()) + ">";
         if (param->is_reference() || (!param->is_reference() || param->is_const()))
         {
             result += "&";
@@ -188,16 +193,24 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
 
     if (param->default_value())
     {
-        result += " = " + generate_node_cxx(param->default_value(), indent, _namespace);
+        result += " = " + generate_node_cxx(param->default_value(), indent, _subsystem);
     }
 
     return result;
 }
 
-static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto func = std::static_pointer_cast<FunctionDeclaration>(node);
     std::string result = mkpadding(indent);
+
+    if (func->name() == "Main" && _subsystem.empty())
+    {
+        if (func->return_type() == "void")
+        {
+            func->return_type() = "int";
+        }
+    }
 
     if (func->return_type().empty())
     {
@@ -207,7 +220,7 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
     {
         if (func->return_arr_size() == std::numeric_limits<uint64_t>::max())
         {
-            result += "vector<" + rectify_type(func->return_type()) + ">";
+            result += "std::vector<" + rectify_type(func->return_type()) + ">";
         }
         else if (func->return_arr_size() > 0)
         {
@@ -223,7 +236,7 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
 
     for (const auto &param : func->parameters())
     {
-        result += generate_function_parameter_cxx(param, indent, _namespace);
+        result += generate_function_parameter_cxx(param, indent, _subsystem);
 
         if (param != func->parameters().back())
         {
@@ -236,9 +249,9 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
     return result;
 }
 
-static std::string generate_class_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_class_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto classdef = std::static_pointer_cast<ClassDeclaration>(node);
     std::string result = mkpadding(indent) + "class " + rectify_name(classdef->name()) + ";\n";
@@ -246,9 +259,9 @@ static std::string generate_class_declaration_cxx(const std::shared_ptr<jcc::Gen
     return result;
 }
 
-static std::string generate_extern_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_extern_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
     auto externdef = std::static_pointer_cast<ExternalDeclaration>(node);
 
@@ -260,32 +273,59 @@ static std::string generate_extern_declaration_cxx(const std::shared_ptr<jcc::Ge
     return "";
 }
 
-static std::string generate_namespace_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_subsystem_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    (void)_namespace;
+    (void)_subsystem;
 
-    auto namespacedef = std::static_pointer_cast<NamespaceDeclaration>(node);
-    std::string result = mkpadding(indent) + "namespace " + rectify_name(namespacedef->name()) + ";\n";
+    auto subsysdecl = std::static_pointer_cast<SubsystemDeclaration>(node);
+
+    std::string result;
+    result += mkpadding(indent) + "/* [";
+    for (size_t i = 0; i < subsysdecl->dependencies().size(); i++)
+    {
+        result += "\"" + rectify_name(subsysdecl->dependencies()[i]) + "\"";
+        if (i != subsysdecl->dependencies().size() - 1)
+        {
+            result += ", ";
+        }
+    }
+    result += "] */\n";
+
+    result += mkpadding(indent) + "namespace " + rectify_name(subsysdecl->name()) + " {}\n";
 
     return result;
 }
 
-static std::string generate_namespace_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_subsystem_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
-    auto namespacedef = std::static_pointer_cast<NamespaceDefinition>(node);
-    std::string ns_name = rectify_name(namespacedef->name());
-    std::string result = mkpadding(indent) + "namespace " + ns_name + "\n";
+    auto subsysdef = std::static_pointer_cast<SubsystemDefinition>(node);
+    std::string ns_name = rectify_name(subsysdef->name());
 
-    _namespace += ns_name + "::";
+    std::string result;
 
-    result += generate_block_cxx(namespacedef->block(), indent, _namespace) + "\n";
+    result += mkpadding(indent) + "/* [";
+    for (size_t i = 0; i < subsysdef->dependencies().size(); i++)
+    {
+        result += "\"" + rectify_name(subsysdef->dependencies()[i]) + "\"";
+        if (i != subsysdef->dependencies().size() - 1)
+        {
+            result += ", ";
+        }
+    }
+    result += "] */\n";
 
-    _namespace = _namespace.substr(0, _namespace.size() - ns_name.size() - 2);
+    result += mkpadding(indent) + "namespace " + ns_name + "\n";
+
+    _subsystem += ns_name + "::";
+
+    result += generate_block_cxx(subsysdef->block(), indent, _subsystem) + "\n";
+
+    _subsystem = _subsystem.substr(0, _subsystem.size() - ns_name.size() - 2);
 
     return result;
 }
 
-static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     static size_t object_id = 0;
     static std::mutex object_id_mutex;
@@ -304,31 +344,44 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
     object_id_mutex.lock();
     g_typenames_mapping_mutex.lock();
     g_reflective_entries_mutex.lock();
-    result += mkpadding(indent) + "class " + struct_name + " : public _j::StructGeneric<" + std::to_string(object_id) + ">\n" + mkpadding(indent) + "{\n";
+    result += mkpadding(indent) + "class " + struct_name + " : public StructGeneric<" + std::to_string(object_id) + ">\n" + mkpadding(indent) + "{\n";
 
-    g_typenames_mapping.insert({object_id, get_qualified_typename(structdef->name(), _namespace)});
-    ReflectiveEntry reflective_entry;
-    reflective_entry.type = get_qualified_typename(structdef->name(), _namespace);
-    for (const auto &field : structdef->fields())
+    // check if struct is already defined
+    bool already_defined = false;
+    for (const auto &entry : g_typenames_mapping)
     {
-        reflective_entry.field_name = rectify_name(field->name());
-        reflective_entry.type = rectify_type(field->type());
-        if (field->arr_size() > 0)
+        if (entry.second == get_qualified_typename(structdef->name(), _subsystem))
         {
-            reflective_entry.count = field->arr_size();
+            already_defined = true;
+            break;
         }
-        else
+    }
+    if (!already_defined)
+    {
+        g_typenames_mapping.insert({object_id, get_qualified_typename(structdef->name(), _subsystem)});
+        ReflectiveEntry reflective_entry;
+        reflective_entry.type = get_qualified_typename(structdef->name(), _subsystem);
+        for (const auto &field : structdef->fields())
         {
-            reflective_entry.count = 1;
+            reflective_entry.field_name = rectify_name(field->name());
+            reflective_entry.type = rectify_type(field->type());
+            if (field->arr_size() > 0)
+            {
+                reflective_entry.count = field->arr_size();
+            }
+            else
+            {
+                reflective_entry.count = 1;
+            }
+            g_reflective_entries[object_id].push_back(reflective_entry);
         }
-        g_reflective_entries[object_id].push_back(reflective_entry);
+
+        object_id++;
     }
 
-    object_id++;
-
+    object_id_mutex.unlock();
     g_reflective_entries_mutex.unlock();
     g_typenames_mapping_mutex.unlock();
-    object_id_mutex.unlock();
 
     result += mkpadding(indent) + "public:\n";
 
@@ -373,7 +426,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
         index_names += rectify_name(field->name());
         if (field->arr_size() > 0)
         {
-            typetmp = "vector<" + rectify_type(field->type()) + ">";
+            typetmp = "std::vector<" + rectify_type(field->type()) + ">";
         }
         else
         {
@@ -410,7 +463,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
     for (const auto &members : structdef->methods())
     {
-        result += generate_node_cxx(members, indent, _namespace);
+        result += generate_node_cxx(members, indent, _subsystem);
     }
 
     for (const auto &field : structdef->fields())
@@ -436,7 +489,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
         }
         else
         {
-            result += mkpadding(indent) + "vector<" + rectify_type(field->type()) + "> " + rectify_name(field->name());
+            result += mkpadding(indent) + "std::vector<" + rectify_type(field->type()) + "> " + rectify_name(field->name());
 
             if (!field->default_value().empty())
             {
@@ -461,12 +514,12 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
     return result;
 }
 
-static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto funcdef = std::static_pointer_cast<FunctionDefinition>(node);
     std::string result = mkpadding(indent);
 
-    if (funcdef->name() == "main" && _namespace == "_jxx::")
+    if (funcdef->name() == "Main" && _subsystem.empty())
     {
         g_has_main_mutex.lock();
         if (g_has_main)
@@ -476,6 +529,12 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
         }
         g_has_main = true;
         g_has_main_mutex.unlock();
+
+        if (funcdef->return_type() == "void")
+        {
+            funcdef->return_type() = "int";
+            funcdef->block()->children().push_back(std::make_shared<ReturnStatement>(std::static_pointer_cast<Expression>(std::make_shared<IntegerLiteralExpression>("0"))));
+        }
     }
 
     if (funcdef->return_type().empty())
@@ -486,7 +545,7 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
     {
         if (funcdef->return_arr_size() == std::numeric_limits<uint64_t>::max())
         {
-            result += "vector<" + rectify_type(funcdef->return_type()) + ">";
+            result += "std::vector<" + rectify_type(funcdef->return_type()) + ">";
         }
         else if (funcdef->return_arr_size() > 0)
         {
@@ -502,7 +561,7 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
 
     for (size_t i = 0; i < funcdef->parameters().size(); i++)
     {
-        result += generate_function_parameter_cxx(funcdef->parameters()[i], indent, _namespace);
+        result += generate_function_parameter_cxx(funcdef->parameters()[i], indent, _subsystem);
 
         if (i != funcdef->parameters().size() - 1)
         {
@@ -512,7 +571,7 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
 
     result += ")\n";
 
-    result += generate_block_cxx(funcdef->block(), indent, _namespace);
+    result += generate_block_cxx(funcdef->block(), indent, _subsystem);
 
     if (funcdef->return_type().empty())
     {
@@ -530,7 +589,7 @@ static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::G
     return result;
 }
 
-static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto funcdef = std::static_pointer_cast<StructMethod>(node);
     std::string result = mkpadding(indent);
@@ -548,7 +607,7 @@ static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::Generic
 
     for (size_t i = 0; i < funcdef->parameters().size(); i++)
     {
-        result += generate_function_parameter_cxx(funcdef->parameters()[i], indent, _namespace);
+        result += generate_function_parameter_cxx(funcdef->parameters()[i], indent, _subsystem);
 
         if (i != funcdef->parameters().size() - 1)
         {
@@ -558,14 +617,14 @@ static std::string generate_struct_method_cxx(const std::shared_ptr<jcc::Generic
 
     result += ")\n";
 
-    result += generate_block_cxx(funcdef->block(), indent, _namespace);
+    result += generate_block_cxx(funcdef->block(), indent, _subsystem);
 
     result += "\n";
 
     return result;
 }
 
-static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_namespace)
+static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     if (node == nullptr)
     {
@@ -575,32 +634,32 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
     switch (node->type())
     {
     case NodeType::Block:
-        return generate_block_cxx(node, indent, _namespace);
+        return generate_block_cxx(node, indent, _subsystem);
     case NodeType::TypeDeclaration:
-        return generate_typedef_cxx(node, indent, _namespace);
+        return generate_typedef_cxx(node, indent, _subsystem);
     case NodeType::StructDeclaration:
-        return generate_struct_declaration_cxx(node, indent, _namespace);
+        return generate_struct_declaration_cxx(node, indent, _subsystem);
     case NodeType::UnionDeclaration:
-        return generate_union_declaration_cxx(node, indent, _namespace);
+        return generate_union_declaration_cxx(node, indent, _subsystem);
     case NodeType::EnumDeclaration:
-        return generate_enum_declaration_cxx(node, indent, _namespace);
+        return generate_enum_declaration_cxx(node, indent, _subsystem);
     case NodeType::FunctionDeclaration:
-        return generate_function_declaration_cxx(node, indent, _namespace);
+        return generate_function_declaration_cxx(node, indent, _subsystem);
     case NodeType::ClassDeclaration:
-        return generate_class_declaration_cxx(node, indent, _namespace);
+        return generate_class_declaration_cxx(node, indent, _subsystem);
     case NodeType::ExternalDeclaration:
-        return generate_extern_declaration_cxx(node, indent, _namespace);
-    case NodeType::NamespaceDeclaration:
-        return generate_namespace_declaration_cxx(node, indent, _namespace);
+        return generate_extern_declaration_cxx(node, indent, _subsystem);
+    case NodeType::SubsystemDeclaration:
+        return generate_subsystem_declaration_cxx(node, indent, _subsystem);
 
-    case NodeType::NamespaceDefinition:
-        return generate_namespace_definition_cxx(node, indent, _namespace);
+    case NodeType::SubsystemDefinition:
+        return generate_subsystem_definition_cxx(node, indent, _subsystem);
     case NodeType::StructDefinition:
-        return generate_struct_definition_cxx(node, indent, _namespace);
+        return generate_struct_definition_cxx(node, indent, _subsystem);
     case NodeType::StructMethod:
-        return generate_struct_method_cxx(node, indent, _namespace);
+        return generate_struct_method_cxx(node, indent, _subsystem);
     case NodeType::FunctionDefinition:
-        return generate_function_definition_cxx(node, indent, _namespace);
+        return generate_function_definition_cxx(node, indent, _subsystem);
 
     case NodeType::ReturnStatement:
     {
@@ -609,7 +668,7 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
 
         if (retstmt->expression() != nullptr)
         {
-            result += " " + generate_node_cxx(retstmt->expression(), indent, _namespace);
+            result += " " + generate_node_cxx(retstmt->expression(), indent, _subsystem);
         }
 
         result += ";\n";
@@ -618,11 +677,11 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
     }
 
     case NodeType::BinaryExpression:
-        return generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->left(), indent, _namespace) + " " + std::static_pointer_cast<BinaryExpression>(node)->op() + " " + generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->right(), indent, _namespace);
+        return generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->left(), indent, _subsystem) + " " + std::static_pointer_cast<BinaryExpression>(node)->op() + " " + generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->right(), indent, _subsystem);
     case NodeType::UnaryExpression:
-        return std::static_pointer_cast<UnaryExpression>(node)->op() + generate_node_cxx(std::static_pointer_cast<UnaryExpression>(node)->expression(), indent, _namespace);
+        return std::static_pointer_cast<UnaryExpression>(node)->op() + generate_node_cxx(std::static_pointer_cast<UnaryExpression>(node)->expression(), indent, _subsystem);
     case NodeType::CastExpression:
-        return "(" + std::static_pointer_cast<CastExpression>(node)->type() + ")" + generate_node_cxx(std::static_pointer_cast<CastExpression>(node)->expression(), indent, _namespace);
+        return "(" + std::static_pointer_cast<CastExpression>(node)->type() + ")" + generate_node_cxx(std::static_pointer_cast<CastExpression>(node)->expression(), indent, _subsystem);
     case NodeType::LiteralExpression:
         return std::static_pointer_cast<LiteralExpression>(node)->value();
     case NodeType::CallExpression:
@@ -632,7 +691,7 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
 
         for (const auto &arg : callexpr->arguments())
         {
-            result += generate_node_cxx(arg, indent, _namespace);
+            result += generate_node_cxx(arg, indent, _subsystem);
         }
 
         result += ")";
@@ -661,14 +720,14 @@ std::string jcc::CompilationUnit::generate(const std::shared_ptr<jcc::AbstractSy
 {
     std::string result;
     uint32_t indent = 0;
-    std::string current_namespace;
+    std::string current_subsystem;
 
     if (target != TargetLanguage::CXX)
     {
         panic("Unsupported target language");
     }
 
-    result += generate_node_cxx(ast->root(), indent, current_namespace);
+    result += generate_node_cxx(ast->root(), indent, current_subsystem);
 
     return result;
 }
@@ -682,190 +741,187 @@ const std::string typedef_commons = R"(#include <cstdint>
 #include <iostream>
 #include <cstdlib>
 
-namespace _jxx
-{
-    typedef bool _bit;
-    typedef int8_t _char;
-    typedef uint8_t _byte;
-    typedef uint16_t _short;
-    typedef uint16_t _word;
-    typedef int32_t _int;
-    typedef uint32_t _dword;
-    typedef int64_t _long;
-    typedef uint64_t _qword;
-    typedef float _float;
-    typedef double _double;
-    typedef ssize_t _intn;
-    typedef size_t _uintn;
-    typedef uintptr_t _address;
-    typedef const char *_string;
-    typedef void *_routine;
+typedef bool _bool;
+typedef int8_t _char;
+typedef uint8_t _byte;
+typedef uint16_t _short;
+typedef uint16_t _word;
+typedef int32_t _int;
+typedef uint32_t _dword;
+typedef int64_t _long;
+typedef uint64_t _qword;
+typedef float _float;
+typedef double _double;
+typedef ssize_t _intn;
+typedef size_t _uintn;
+typedef uintptr_t _address;
+typedef const char *_string;
+typedef void *_routine;
 #define _null nullptr
 #define _void void
-#define _vector std::vector
-};)";
+)";
 
-const std::string structure_generic_baseclass = R"(    /* Begin Common Sink functions */
+const std::string structure_generic_baseclass = R"(/* Begin Common Sink functions */
 
 #ifdef __linux__
 #include <execinfo.h>
 
-    // no warn unused
-    [[gnu::used]] [[noreturn]] static void _panic(_jxx::_string message)
+// no warn unused
+[[gnu::used]] [[noreturn]] static void _panic(_string message)
+{
+    std::cerr << "PANIC: " << message << std::endl;
+
+    void *array[10];
+    size_t size;
+    char **strings;
+
+    size = backtrace(array, 10);
+    strings = backtrace_symbols(array, size);
+
+    std::cerr << "Begin Backtrace:" << std::endl;
+    for (size_t i = 0; i < size; i++)
     {
-        std::cerr << "PANIC: " << message << std::endl;
+        std::cerr << strings[i] << std::endl;
+    }
+    std::cerr << "End Backtrace" << std::endl;
 
-        void *array[10];
-        size_t size;
-        char **strings;
+    // Don't free strings, just leak it
 
-        size = backtrace(array, 10);
-        strings = backtrace_symbols(array, size);
-
-        std::cerr << "Begin Backtrace:" << std::endl;
-        for (size_t i = 0; i < size; i++)
-        {
-            std::cerr << strings[i] << std::endl;
-        }
-        std::cerr << "End Backtrace" << std::endl;
-
-        // Don't free strings, just leak it
-
-        std::_Exit(1);
-    }  
+    std::_Exit(1);
+}  
 #else
-    [[gnu::used]] [[noreturn]] static void _panic(_jxx::_string message)
-    {
-        std::cerr << "PANIC: " << message << std::endl;
-        abort();
+[[gnu::used]] [[noreturn]] static void _panic(_string message)
+{
+    std::cerr << "PANIC: " << message << std::endl;
+    abort();
 
-        while (true) {}
-    }  
+    while (true) {}
+}  
 #endif
-    
-    
-    /* Begin Generic Structure Base Class */
-    typedef _jxx::_qword typeid_t;
 
-    static std::map<typeid_t, _jxx::_string> g_typenames_mapping = {!!!/* JCC_TYPENAMES_MAPPING */!!!};
-    static std::map<_jxx::_string, typeid_t> g_typenames_mapping_reverse = {!!!/* JCC_TYPENAMES_MAPPING_REVERSE */!!!};
-    static std::map<std::string, _jxx::_uintn> g_builtin_sizes = {{"_bit", 1}, {"_byte", 1}, {"_char", 1}, {"_word", 2}, {"_short", 2}, {"_dword", 4}, {"_int", 4}, {"_float", 4}, {"_double", 8}, {"_qword", 8}, {"_long", 8}, {"_string", 8}, {"_routine", 8}, {"_address", 8}};
-    struct ReflectiveEntry {
-        _jxx::_string field_name;
-        _jxx::_string type;
-        _jxx::_uintn count;
-    };
 
-    static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {!!!/* JCC_REFLECTIVE_ENTRIES */!!!};
+/* Begin Generic Structure Base Class */
+typedef _qword typeid_t;
 
-    template <typeid_t T>
-    class StructGeneric
+static std::map<typeid_t, _string> g_typenames_mapping = {!!!/* JCC_TYPENAMES_MAPPING */!!!};
+static std::map<_string, typeid_t> g_typenames_mapping_reverse = {!!!/* JCC_TYPENAMES_MAPPING_REVERSE */!!!};
+static std::map<std::string, _uintn> g_builtin_sizes = {{"_bool", 1}, {"_byte", 1}, {"_char", 1}, {"_word", 2}, {"_short", 2}, {"_dword", 4}, {"_int", 4}, {"_float", 4}, {"_double", 8}, {"_qword", 8}, {"_long", 8}, {"_string", 8}, {"_routine", 8}, {"_address", 8}};
+struct ReflectiveEntry {
+    _string field_name;
+    _string type;
+    _uintn count;
+};
+
+static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {!!!/* JCC_REFLECTIVE_ENTRIES */!!!};
+
+template <typeid_t T>
+class StructGeneric
+{
+protected:
+    static const typeid_t m_typeid = T;
+    static std::map<typeid_t, std::map<_string, const void *>> m_attributes;
+
+public:
+    inline typeid_t _typeid() const
     {
-    protected:
-        static const typeid_t m_typeid = T;
-        static std::map<typeid_t, std::map<_jxx::_string, const void *>> m_attributes;
+        return m_typeid;
+    }
 
-    public:
-        inline typeid_t _typeid() const
+    inline _string _typename() const
+    {
+        return g_typenames_mapping.at(m_typeid);
+    }
+
+    inline bool _has(_string name) const
+    {
+        return m_attributes.at(m_typeid).find(name) != m_attributes.at(m_typeid).end();
+    }
+
+    bool _hasfield(_string name) const
+    {
+        _string index_names = this->_get("_index_names");
+        int state = 0;
+
+        while (*index_names)
         {
-            return m_typeid;
-        }
-
-        inline _jxx::_string _typename() const
-        {
-            return g_typenames_mapping.at(m_typeid);
-        }
-
-        inline bool _has(_jxx::_string name) const
-        {
-            return m_attributes.at(m_typeid).find(name) != m_attributes.at(m_typeid).end();
-        }
-
-        bool _hasfield(_jxx::_string name) const
-        {
-            _jxx::_string index_names = this->_get("_index_names");
-            int state = 0;
-
-            while (*index_names)
+            // ',' reset
+            if (*index_names == ',')
             {
-                // ',' reset
-                if (*index_names == ',')
-                {
-                    state = 0;
-                    index_names++;
-                    continue;
-                }
-
-                if (strncmp(index_names, name, strlen(name)) == 0)
-                {
-                    return true;
-                }
-
+                state = 0;
                 index_names++;
+                continue;
             }
 
-            return false;
-        }
-
-        inline void _set(_jxx::_string name, _jxx::_string value) const
-        {
-            m_attributes[m_typeid][name] = (void *)value;
-        }
-
-        inline void _set(_jxx::_string name, long value) const
-        {
-            m_attributes[m_typeid][name] = (void *)value;
-        }
-
-        inline _jxx::_string _get(_jxx::_string name) const
-        {
-            return (_jxx::_string)m_attributes.at(m_typeid).at(name);
-        }
-
-        inline long _getint(_jxx::_string name) const
-        {
-            return (_jxx::_qword)m_attributes.at(m_typeid).at(name);
-        }
-
-        static inline _jxx::_string _gettypename(typeid_t type)
-        {
-            return g_typenames_mapping.at(type);
-        }
-
-        static inline typeid_t _gettypeid(_jxx::_string name)
-        {
-            return g_typenames_mapping_reverse.at(name);
-        }
-
-        static size_t _sizeof(typeid_t id)
-        {
-            size_t size = 0;
-            for (auto &field_type : g_reflective_entries.at(id))
+            if (strncmp(index_names, name, strlen(name)) == 0)
             {
-                if (g_builtin_sizes.contains(field_type.type))
-                {
-                    size += g_builtin_sizes.at(field_type.type) * field_type.count;
-                }
-                else
-                {
-                    size += _sizeof(_gettypeid(field_type.type)) * field_type.count;
-                }
+                return true;
             }
 
-            return size;
+            index_names++;
         }
 
-        inline size_t _sizeof() const
+        return false;
+    }
+
+    inline void _set(_string name, _string value) const
+    {
+        m_attributes[m_typeid][name] = (void *)value;
+    }
+
+    inline void _set(_string name, long value) const
+    {
+        m_attributes[m_typeid][name] = (void *)value;
+    }
+
+    inline _string _get(_string name) const
+    {
+        return (_string)m_attributes.at(m_typeid).at(name);
+    }
+
+    inline long _getint(_string name) const
+    {
+        return (_qword)m_attributes.at(m_typeid).at(name);
+    }
+
+    static inline _string _gettypename(typeid_t type)
+    {
+        return g_typenames_mapping.at(type);
+    }
+
+    static inline typeid_t _gettypeid(_string name)
+    {
+        return g_typenames_mapping_reverse.at(name);
+    }
+
+    static size_t _sizeof(typeid_t id)
+    {
+        size_t size = 0;
+        for (auto &field_type : g_reflective_entries.at(id))
         {
-            return _sizeof(m_typeid);
+            if (g_builtin_sizes.contains(field_type.type))
+            {
+                size += g_builtin_sizes.at(field_type.type) * field_type.count;
+            }
+            else
+            {
+                size += _sizeof(_gettypeid(field_type.type)) * field_type.count;
+            }
         }
-    };
 
-    template <typeid_t T>
-    std::map<typeid_t, std::map<_jxx::_string, const void *>> StructGeneric<T>::m_attributes;
-    template <typeid_t T>
-    const typeid_t StructGeneric<T>::m_typeid;
-    /* End Generic Structure Base Class */)";
+        return size;
+    }
+
+    inline size_t _sizeof() const
+    {
+        return _sizeof(m_typeid);
+    }
+};
+
+template <typeid_t T>
+std::map<typeid_t, std::map<_string, const void *>> StructGeneric<T>::m_attributes;
+template <typeid_t T>
+const typeid_t StructGeneric<T>::m_typeid;
+/* End Generic Structure Base Class */)";
 
 bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::string, std::string>> &sources, const std::string &output_cxx)
 {
@@ -990,9 +1046,7 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::s
             tmp.replace(pos, 34, reflective_entries);
         }
 
-        output_cxx_stream << "namespace _j {\n";
         output_cxx_stream << tmp << "\n";
-        output_cxx_stream << "};\n\n";
     }
 
     for (const auto &source : sources)
@@ -1045,7 +1099,10 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::s
     g_has_main_mutex.lock();
     if (g_has_main)
     {
-        output_cxx_stream << "\nint main(int argc, char **argv)\n{\n    return _jxx::_main();\n}\n";
+        output_cxx_stream << "\nint main(int argc, char **argv)\n{\n";
+        output_cxx_stream << mkpadding(INDENT_SIZE) << "std::vector<std::string> args(argv, argv + argc);\n";
+        output_cxx_stream << mkpadding(INDENT_SIZE) << "return Main(args);\n";
+        output_cxx_stream << "}\n";
     }
     g_has_main_mutex.unlock();
 
@@ -1069,4 +1126,18 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::s
     output_cxx_stream.close();
 
     return true;
+}
+
+std::string jcc::CompilationUnit::compile(const std::string &source, jcc::TargetLanguage target)
+{
+    if (target != TargetLanguage::CXX)
+    {
+        panic("Unsupported target language");
+    }
+
+    TokenList tokens = lex(source);
+
+    std::shared_ptr<AbstractSyntaxTree> ast = parse(tokens);
+
+    return generate(ast, target);
 }

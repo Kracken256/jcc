@@ -41,13 +41,13 @@ namespace jcc
         FunctionDeclaration,
         ClassDeclaration,
         ExternalDeclaration,
-        NamespaceDeclaration,
+        SubsystemDeclaration,
 
         ///===================
         /// Definitions
         ///===================
 
-        NamespaceDefinition,
+        SubsystemDefinition,
         StructField,
         StructMethod,
         StructAttribute,
@@ -159,12 +159,14 @@ namespace jcc
     class Block : public GenericNode
     {
     public:
-        Block(NodeType type = NodeType::Block) : GenericNode(type) {}
-        Block(const std::vector<std::shared_ptr<GenericNode>> &children) : GenericNode(NodeType::Block), m_children(children) {}
+        Block(NodeType type = NodeType::Block) : GenericNode(type), m_render_braces(true) {}
+        Block(const std::vector<std::shared_ptr<GenericNode>> &children, bool render_braces = true) : GenericNode(NodeType::Block), m_children(children), m_render_braces(render_braces) {}
         virtual ~Block() {}
 
         const std::vector<std::shared_ptr<GenericNode>> &children() const { return m_children; }
         std::vector<std::shared_ptr<GenericNode>> &children() { return m_children; }
+        const bool &render_braces() const { return m_render_braces; }
+        bool &render_braces() { return m_render_braces; }
 
         void push(std::shared_ptr<GenericNode> node) { m_children.push_back(node); }
 
@@ -173,6 +175,7 @@ namespace jcc
 
     protected:
         std::vector<std::shared_ptr<GenericNode>> m_children;
+        bool m_render_braces;
     };
 
     ///=================================================================================================
@@ -364,36 +367,43 @@ namespace jcc
         std::shared_ptr<Declaration> m_declaration;
     };
 
-    class NamespaceDeclaration : public Declaration
+    class SubsystemDeclaration : public Declaration
     {
     public:
-        NamespaceDeclaration(NodeType type = NodeType::NamespaceDeclaration) : Declaration(type) {}
-        NamespaceDeclaration(const std::string &name) : Declaration(NodeType::NamespaceDeclaration), m_name(name) {}
-        virtual ~NamespaceDeclaration() {}
+        SubsystemDeclaration(NodeType type = NodeType::SubsystemDeclaration) : Declaration(type) {}
+        SubsystemDeclaration(const std::string &name, const std::vector<std::string> &dependencies = {}) : Declaration(NodeType::SubsystemDeclaration), m_name(name), m_dependencies(dependencies) {}
+        virtual ~SubsystemDeclaration() {}
 
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override { return "NamespaceDeclaration(" + m_name + ")"; }
-        std::string to_json() const override { return "{\"type\":\"namespace_declaration\",\"name\":\"" + json_escape(m_name) + "\"}"; }
+        const std::vector<std::string> &dependencies() const { return m_dependencies; }
+        std::vector<std::string> &dependencies() { return m_dependencies; }
+
+        std::string to_string() const override { return "SubsystemDeclaration(" + m_name + ")"; }
+        std::string to_json() const override { return "{\"type\":\"subsystem_declaration\",\"name\":\"" + json_escape(m_name) + "\"}"; }
 
     protected:
         std::string m_name;
+        std::vector<std::string> m_dependencies;
     };
 
     ///=================================================================================================
     /// Definitions types
     ///=================================================================================================
 
-    class NamespaceDefinition : public Definition
+    class SubsystemDefinition : public Definition
     {
     public:
-        NamespaceDefinition(NodeType type = NodeType::NamespaceDefinition) : Definition(type) {}
-        NamespaceDefinition(const std::string &name, std::shared_ptr<Block> block) : Definition(NodeType::NamespaceDefinition), m_name(name), m_block(block) {}
-        virtual ~NamespaceDefinition() {}
+        SubsystemDefinition(NodeType type = NodeType::SubsystemDefinition) : Definition(type) {}
+        SubsystemDefinition(const std::string &name, std::shared_ptr<Block> block, const std::vector<std::string> &dependencies = {}) : Definition(NodeType::SubsystemDefinition), m_name(name), m_block(block), m_dependencies(dependencies) {}
+        virtual ~SubsystemDefinition() {}
 
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
+
+        const std::vector<std::string> &dependencies() const { return m_dependencies; }
+        std::vector<std::string> &dependencies() { return m_dependencies; }
 
         const std::shared_ptr<Block> &block() const { return m_block; }
         std::shared_ptr<Block> &block() { return m_block; }
@@ -404,6 +414,7 @@ namespace jcc
     protected:
         std::string m_name;
         std::shared_ptr<Block> m_block;
+        std::vector<std::string> m_dependencies;
     };
 
     class StructAttribute : public GenericNode

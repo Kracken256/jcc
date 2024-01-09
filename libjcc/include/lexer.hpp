@@ -30,7 +30,6 @@ namespace jcc
     {
         // Namespaces
         Namemap,
-        Namespace,
         Subsystem,
 
         // Symbols import/export
@@ -90,7 +89,7 @@ namespace jcc
         Enum,
 
         // Types
-        Bit,
+        Bool,
         Char,
         Byte,
         Short,
@@ -121,7 +120,6 @@ namespace jcc
 
     const std::map<const char *, jcc::Keyword> lexKeywordMap = {
         {"namemap", jcc::Keyword::Namemap},
-        {"namespace", jcc::Keyword::Namespace},
         {"subsystem", jcc::Keyword::Subsystem},
 
         {"import", jcc::Keyword::Import},
@@ -173,7 +171,7 @@ namespace jcc
 
         {"enum", jcc::Keyword::Enum},
 
-        {"bit", jcc::Keyword::Bit},
+        {"bool", jcc::Keyword::Bool},
         {"char", jcc::Keyword::Char},
         {"byte", jcc::Keyword::Byte},
         {"short", jcc::Keyword::Short},
@@ -203,7 +201,6 @@ namespace jcc
 
     const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
         {jcc::Keyword::Namemap, "namemap"},
-        {jcc::Keyword::Namespace, "namespace"},
         {jcc::Keyword::Subsystem, "subsystem"},
 
         {jcc::Keyword::Import, "import"},
@@ -255,7 +252,7 @@ namespace jcc
 
         {jcc::Keyword::Enum, "enum"},
 
-        {jcc::Keyword::Bit, "bit"},
+        {jcc::Keyword::Bool, "bool"},
         {jcc::Keyword::Char, "char"},
         {jcc::Keyword::Byte, "byte"},
         {jcc::Keyword::Short, "short"},

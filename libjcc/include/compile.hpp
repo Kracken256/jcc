@@ -168,25 +168,31 @@ namespace jcc
         /// @brief Reset instance and clear all build-specific ephemeral data (keep user parameters)
         void reset_instance();
 
-        /// @brief Perform lexical analysis on JXX source code
+        /// @brief Lex a string of J++ source code into a list of tokens.
         /// @param source JXX source code raw string
         /// @return A vector of tokens
         /// @throw LexerException
-        TokenList lex(const std::string &source);
+        static TokenList lex(const std::string &source);
 
         /// @brief Parse a list of tokens into an abstract syntax tree.
         /// @param tokens Tokens to parse.
         /// @return Abstract syntax tree.
         /// @throw UnexpectedTokenError
-        std::shared_ptr<AbstractSyntaxTree> parse(const TokenList &tokens);
+        static std::shared_ptr<AbstractSyntaxTree> parse(const TokenList &tokens);
 
         /// @brief Synthesize target language source code from an abstract syntax tree.
         /// @param ast Abstract syntax tree.
         /// @param target Target language.
         /// @return Target language source code.
-        std::string generate(const std::shared_ptr<AbstractSyntaxTree> &ast, TargetLanguage target = TargetLanguage::CXX);
+        static std::string generate(const std::shared_ptr<AbstractSyntaxTree> &ast, TargetLanguage target = TargetLanguage::CXX);
 
         static bool join_to_output_cxx(const std::vector<std::pair<std::string, std::string>> &sources, const std::string &output_cxx);
+
+        /// @brief Nothing fancy, just compile a string of J++ source code
+        /// @param source J++ source code
+        /// @param target Target language
+        /// @return Compiled source code
+        static std::string compile(const std::string &source, TargetLanguage target = TargetLanguage::CXX);
 
     private:
         std::vector<std::string> m_files;
@@ -232,7 +238,6 @@ namespace jcc
         /// @return True if successful, false otherwise
         /// @note This function will populate the messages vector
         bool invoke_jcc_helper_ld(const std::string &input_objs, const std::string &outputname, const std::vector<std::string> &flags, const std::string &program);
-
     };
 
     class CompilationJob

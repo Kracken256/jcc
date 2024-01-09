@@ -115,7 +115,7 @@ namespace jcc
 static bool is_builtin_type(const std::string &type)
 {
     // integers and floating point numbers
-    if (type == "bit" || type == "byte" || type == "char" || type == "word" || type == "short" || type == "dword" || type == "int" || type == "qword" || type == "long" || type == "float" || type == "double" || type == "intn" || type == "uintn" || type == "address" || type == "routine")
+    if (type == "bool" || type == "byte" || type == "char" || type == "word" || type == "short" || type == "dword" || type == "int" || type == "qword" || type == "long" || type == "float" || type == "double" || type == "intn" || type == "uintn" || type == "address" || type == "routine")
     {
         return true;
     }
@@ -272,7 +272,7 @@ std::string jcc::FunctionParameter::to_string() const
 
 std::string jcc::FunctionParameter::to_json() const
 {
-    std::string str = "{\"type\":\"function_parameter\",\"name\":\"" + json_escape(m_name) + "\",\"type\":\"" + json_escape(m_type) + "\"}";
+    std::string str = "{\"type\":\"function_parameter\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":\"" + json_escape(m_type) + "\"}";
     return str;
 }
 
@@ -338,18 +338,18 @@ std::string std::to_string(const std::shared_ptr<jcc::GenericNode> value)
 }
 
 ///=============================================================================
-/// NamespaceDefinition
+/// SubsystemDefinition
 ///=============================================================================
 
-std::string jcc::NamespaceDefinition::to_string() const
+std::string jcc::SubsystemDefinition::to_string() const
 {
-    std::string str = "NamespaceDefinition(" + m_name + ", {" + m_block->to_string() + "})";
+    std::string str = "SubsystemDefinition(" + m_name + ", {" + m_block->to_string() + "})";
     return str;
 }
 
-std::string jcc::NamespaceDefinition::to_json() const
+std::string jcc::SubsystemDefinition::to_json() const
 {
-    std::string str = "{\"type\":\"namespace_definition\",\"name\":\"" + json_escape(m_name) + "\",\"block\":" + m_block->to_json() + "}";
+    std::string str = "{\"type\":\"subsystem_definition\",\"name\":\"" + json_escape(m_name) + "\",\"block\":" + m_block->to_json() + "}";
     return str;
 }
 
@@ -359,7 +359,16 @@ std::string jcc::NamespaceDefinition::to_json() const
 
 std::string jcc::StructField::to_json() const
 {
-    std::string str = "{\"type\":\"struct_field\",\"name\":\"" + json_escape(m_name) + "\",\"type\":\"" + json_escape(m_type) + "\",\"default_value\":\"" + json_escape(m_default_value) + "\",\"bitfield\":" + std::to_string(m_bitfield) + ",\"arr_size\":" + std::to_string(m_arr_size) + ",\"attributes\":[";
+    std::string str = "{\"type\":\"struct_field\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":\"" + json_escape(m_type) + "\",\"default_value\":\"" + json_escape(m_default_value) + "\",\"bitfield\":" + std::to_string(m_bitfield) + ",\"arr_size\":";
+    if (!m_arr_size)
+    {
+        str += "\"dynamic\"";
+    }
+    else
+    {
+        str += std::to_string(m_arr_size);
+    }
+    str += ",\"attributes\":[";
     for (auto &attribute : m_attributes)
     {
         str += attribute->to_json();
@@ -566,15 +575,11 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
         switch (curtok.type())
         {
         case TokenType::Identifier:
+            throw SyntaxError("Unexpected identifier: " + std::get<std::string>(curtok.value()));
             break; // implement this
         case TokenType::Keyword:
             switch (std::get<jcc::Keyword>(curtok.value()))
             {
-            case Keyword::Namespace:
-                if (!parse_namespace_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
             case Keyword::Subsystem:
                 if (!parse_subsystem_keyword(tokens, tmp))
                     return false;
@@ -695,7 +700,7 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                 break;
 
             default:
-                break;
+                throw SyntaxError("Unexpected punctuator: " + std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(curtok.value()))));
             }
             break;
         case TokenType::MultiLineComment:
@@ -1272,13 +1277,11 @@ static bool jcc::parse_typedef_keyword(jcc::TokenList &tokens, std::shared_ptr<j
     return false;
 }
 
-static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+static bool jcc::parse_subsystem_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
-    using namespace jcc;
-
     if (tokens.size() < 3)
     {
-        throw SyntaxError("Expected identifier after namespace keyword");
+        throw SyntaxError("Expected identifier after subsystem keyword");
         return false;
     }
 
@@ -1287,55 +1290,92 @@ static bool jcc::parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr
 
     if (next_1.type() != TokenType::Identifier)
     {
-        throw SyntaxError("Expected identifier after namespace keyword");
+        throw SyntaxError("Expected identifier after subsystem keyword");
         return false;
     }
 
     if (next_2.type() != TokenType::Punctuator)
     {
-        throw SyntaxError("Expected punctuator after namespace identifier");
-        return false;
-    }
-
-    if (std::get<Punctuator>(next_2.value()) == Punctuator::Semicolon)
-    {
-        std::shared_ptr<NamespaceDeclaration> namespace_ptr = std::make_shared<NamespaceDeclaration>(std::get<std::string>(next_1.value()));
-        node = namespace_ptr;
+        node = std::make_shared<SubsystemDeclaration>(std::get<std::string>(next_1.value()));
         tokens.pop(2);
         return true;
     }
-    else if (std::get<Punctuator>(next_2.value()) != Punctuator::OpenBrace)
+
+    if (std::get<Punctuator>(next_2.value()) == Punctuator::OpenBrace)
     {
-        throw SyntaxError("Expected punctuator after namespace identifier");
+        tokens.pop(2);
+        std::shared_ptr<GenericNode> block = std::make_shared<Block>();
+
+        if (!parse_block(tokens, block, false))
+        {
+            return false;
+        }
+
+        node = std::make_shared<SubsystemDefinition>(std::get<std::string>(next_1.value()), std::static_pointer_cast<Block>(block));
+        return true;
+    }
+    else if (std::get<Punctuator>(next_2.value()) != Punctuator::Colon)
+    {
+        throw SyntaxError("Expected punctuator after subsystem identifier");
         return false;
     }
 
-    tokens.pop(2);
+    tokens.pop(3);
+
+    std::vector<std::string> dependencies;
+
+    // name1, name2, name3, name4...
+    while (1)
+    {
+        Token curtok = tokens.peek();
+
+        if (curtok.type() != TokenType::Identifier)
+        {
+            throw SyntaxError("Expected identifier in subsystem dependencies");
+            return false;
+        }
+
+        dependencies.push_back(std::get<std::string>(curtok.value()));
+
+        tokens.pop();
+
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected seperator in subsystem dependencies");
+            return false;
+        }
+
+        curtok = tokens.peek();
+
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Comma)
+        {
+            tokens.pop();
+            continue;
+        }
+        else if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBrace)
+        {
+            break;
+        }
+        else
+        {
+            // done with declaration
+            node = std::make_shared<SubsystemDeclaration>(std::get<std::string>(next_1.value()), dependencies);
+            return true;
+        }
+    }
 
     std::shared_ptr<GenericNode> block = std::make_shared<Block>();
-
     if (!parse_block(tokens, block, false))
     {
         return false;
     }
 
-    node = std::make_shared<NamespaceDefinition>(std::get<std::string>(next_1.value()), std::static_pointer_cast<Block>(block));
-
+    node = std::make_shared<SubsystemDefinition>(std::get<std::string>(next_1.value()), std::static_pointer_cast<Block>(block), dependencies);
     return true;
-}
-
-static bool jcc::parse_subsystem_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
-{
-    (void)tokens;
-    (void)node;
-    /// TODO: implement this
-    return false;
 }
 
 static bool jcc::parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params)
 {
-    using namespace jcc;
-
     if (tokens.size() < 2)
     {
         throw SyntaxError("Expected closing parenthesis in function parameters");
@@ -1904,13 +1944,7 @@ std::shared_ptr<jcc::AbstractSyntaxTree> jcc::CompilationUnit::parse(const jcc::
         return nullptr;
     }
 
-    if (std::static_pointer_cast<Block>(rootnode)->children().size() != 1)
-    {
-        throw ParserException("Expected single child in root node");
-        return nullptr;
-    }
-
-    rootnode = std::static_pointer_cast<Block>(rootnode)->children()[0];
+    std::static_pointer_cast<Block>(rootnode)->render_braces() = false;
 
     if (rootnode == nullptr)
     {

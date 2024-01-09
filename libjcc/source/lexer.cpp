@@ -364,6 +364,8 @@ static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
     {"?", 1}, // ternary
 };
 
+static char lexKeywordStartChars[] = "nsielvruftcpoamwdbq";
+
 static const char lexIdentifierChars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_:";
 static const size_t lexIdentifierCharsLength = (sizeof(lexIdentifierChars) - 1) / sizeof(char);
 
@@ -578,6 +580,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
     /// TODO: Run unit tests on this function
     std::string current_token;
     TokenList result;
+    result.m_tokens.reserve((float)source.length() / 10);
     LexerState state = LexerState::Default;
     LexerStateModifier modifier = LexerStateModifier::None;
     size_t i = 0, src_length, line = 1, column = 1;
@@ -592,6 +595,19 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
         switch (state)
         {
         case LexerState::Default:
+            // Check for whitespace
+            if (std::isspace(current_char))
+            {
+                state = LexerState::Whitespace;
+                continue;
+            }
+            // Check for number literal
+            if (std::isdigit(current_char))
+            {
+                state = LexerState::NumberLiteral;
+                continue;
+            }
+
             // Check for single line comment
             if (src_length - i >= 2 && current_char == '/' && source[i + 1] == '/')
             {
@@ -728,26 +744,40 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
 
             // Check for keyword
             found = false;
-            for (auto kw : lexKeywordMap)
+            // check lexKeywordStartChars
+            for (size_t j = 0; j < sizeof(lexKeywordStartChars) / sizeof(char); j++)
             {
-                size_t kw_length = strlen(kw.first);
-                if (src_length - i >= kw_length && source.substr(i, kw_length) == kw.first)
+                if (current_char == lexKeywordStartChars[j])
                 {
-                    // verify next character is not an identifier character
-                    if (src_length - i > kw_length && std::strchr(lexIdentifierChars, source[i + kw_length]))
+                    for (auto kw : lexKeywordMap)
                     {
-                        break;
-                    }
+                        size_t kw_length = strlen(kw.first);
+                        if (src_length - i >= kw_length && source.substr(i + 1, kw_length - 1) == kw.first + 1)
+                        {
+                            // verify next character is not an identifier character
+                            if (src_length - i > kw_length && std::strchr(lexIdentifierChars, source[i + kw_length]))
+                            {
+                                break;
+                            }
 
-                    result.push_back(Token(TokenType::Keyword, kw.second));
-                    i += kw_length - 1;
-                    found = true;
+                            result.push_back(Token(TokenType::Keyword, kw.second));
+                            i += kw_length - 1;
+                            found = true;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
             if (found)
             {
                 break;
+            }
+
+            if (current_char == '`')
+            {
+                state = LexerState::Raw;
+                continue;
             }
 
             // Check for identifier
@@ -758,26 +788,6 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                     state = LexerState::Identifier;
                     continue;
                 }
-            }
-
-            // Check for number literal
-            if (std::isdigit(current_char))
-            {
-                state = LexerState::NumberLiteral;
-                continue;
-            }
-
-            // Check for whitespace
-            if (std::isspace(current_char))
-            {
-                state = LexerState::Whitespace;
-                continue;
-            }
-
-            if (current_char == '`')
-            {
-                state = LexerState::Raw;
-                continue;
             }
 
             // invalid state
