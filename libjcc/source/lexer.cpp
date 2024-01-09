@@ -752,7 +752,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                     for (auto kw : lexKeywordMap)
                     {
                         size_t kw_length = strlen(kw.first);
-                        if (src_length - i >= kw_length && source.substr(i + 1, kw_length - 1) == kw.first + 1)
+                        if (src_length - i >= kw_length && source.substr(i, kw_length) == kw.first)
                         {
                             // verify next character is not an identifier character
                             if (src_length - i > kw_length && std::strchr(lexIdentifierChars, source[i + kw_length]))

@@ -442,6 +442,25 @@ std::string jcc::StructDefinition::to_json() const
 }
 
 ///=============================================================================
+/// UnionDefinition
+///=============================================================================
+
+std::string jcc::UnionDefinition::to_json() const
+{
+    std::string str = "{\"type\":\"union_definition\",\"name\":\"" + json_escape(m_name) + "\",\"fields\":[";
+    for (const auto &child : m_fields)
+    {
+        str += child->to_json() + ",";
+    }
+    if (m_fields.size() > 0)
+    {
+        str.pop_back();
+    }
+    str += "]}";
+    return str;
+}
+
+///=============================================================================
 /// FunctionDefinition
 ///=============================================================================
 
@@ -515,6 +534,49 @@ std::string jcc::CallExpression::to_json() const
     return str;
 }
 
+std::string jcc::TypeNode::to_json() const
+{
+    std::string str = "{\"type\":\"type_node\",\"name\":\"" + json_escape(m_name) + "\",\"is_const\":" + std::to_string(m_is_const) + ",\"is_ref\":" + std::to_string(m_is_reference) + ",";
+    if (m_arr_size == std::numeric_limits<size_t>::max())
+    {
+        str += "\"arr_size\":\"dynamic\"";
+    }
+    else
+    {
+        str += "\"arr_size\":" + std::to_string(m_arr_size);
+    }
+    str += ",\"bitfield\":" + std::to_string(m_bitfield);
+
+    if (m_default_value)
+    {
+        str += ",\"default_value\":" + m_default_value->to_json();
+    }
+    str += "}";
+    return str;
+}
+
+///=============================================================================
+/// LetDeclaration
+///=============================================================================
+
+std::string jcc::LetDeclaration::to_json() const
+{
+    std::string str = "{\"type\":\"let_declaration\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_type->to_json() + "}";
+
+    return str;
+}
+
+///=============================================================================
+/// VarDeclaration
+///=============================================================================
+
+std::string jcc::VarDeclaration::to_json() const
+{
+    std::string str = "{\"type\":\"var_declaration\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_type->to_json() + "}";
+
+    return str;
+}
+
 ///=============================================================================
 /// Parser
 ///=============================================================================
@@ -543,6 +605,183 @@ namespace jcc
     static bool parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_extern_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr_size, bool allow_default_value, std::shared_ptr<jcc::TypeNode> &node);
+}
+
+bool jcc::parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr_size, bool allow_default_value, std::shared_ptr<jcc::TypeNode> &node)
+{
+    // [const] [ref] {typename} [[arr_size]|bitfield] [= default_value]
+
+    bool is_const = false;
+    bool is_ref = false;
+    bool is_bitfield = false;
+    std::string type;
+    std::shared_ptr<GenericNode> default_value;
+    size_t arr_size = 0;
+    size_t bitfield = 0;
+
+    if (tokens.size() < 1)
+    {
+        throw SyntaxError("Expected typename");
+        return false;
+    }
+
+    // check for const
+    Token curtok = tokens.peek();
+    if (curtok.type() == TokenType::Keyword && std::get<Keyword>(curtok.value()) == Keyword::Const)
+    {
+        is_const = true;
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename");
+            return false;
+        }
+        curtok = tokens.peek();
+    }
+
+    // check for ref
+    if (curtok.type() == TokenType::Keyword && std::get<Keyword>(curtok.value()) == Keyword::Ref)
+    {
+        is_ref = true;
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename");
+            return false;
+        }
+        curtok = tokens.peek();
+    }
+
+    // check for typename
+    if (curtok.type() == TokenType::Identifier)
+    {
+        type = std::get<std::string>(curtok.value());
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename");
+            return false;
+        }
+        curtok = tokens.peek();
+    }
+    else if (curtok.type() == TokenType::Keyword)
+    {
+        type = lexKeywordMapReverse.at(std::get<Keyword>(curtok.value()));
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename");
+            return false;
+        }
+        curtok = tokens.peek();
+    }
+    else
+    {
+        throw SyntaxError("Expected typename");
+        return false;
+    }
+
+    // check for bitfield
+    if (allow_bitfield && curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+    {
+        is_bitfield = true;
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected bitfield");
+            return false;
+        }
+        curtok = tokens.peek();
+        if (curtok.type() != TokenType::NumberLiteral)
+        {
+            throw SyntaxError("Expected bitfield");
+            return false;
+        }
+        bitfield = std::stoll(std::get<std::string>(curtok.value()));
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename");
+            return false;
+        }
+        curtok = tokens.peek();
+    }
+
+    // check for arr_size
+    if (allow_arr_size && curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
+    {
+        // we can't have both bitfield and arr_size
+        if (is_bitfield)
+        {
+            throw SyntaxError("Unexpected arr_size");
+            return false;
+        }
+
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected arr_size");
+            return false;
+        }
+        curtok = tokens.peek();
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBracket)
+        {
+            // dynamic array
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected typename");
+                return false;
+            }
+            curtok = tokens.peek();
+            arr_size = std::numeric_limits<size_t>::max();
+        }
+        else if (curtok.type() == TokenType::NumberLiteral)
+        {
+            // fixed array
+            arr_size = std::stoll(std::get<std::string>(curtok.value()));
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected typename");
+                return false;
+            }
+            curtok = tokens.peek();
+            if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::CloseBracket)
+            {
+                throw SyntaxError("Expected closing bracket");
+                return false;
+            }
+            tokens.pop();
+            if (tokens.eof())
+            {
+                throw SyntaxError("Expected typename");
+                return false;
+            }
+            curtok = tokens.peek();
+        }
+        else
+        {
+            throw SyntaxError("Expected arr_size");
+            return false;
+        }
+    }
+
+    // check for default value
+    if (allow_default_value && curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
+    {
+        tokens.pop();
+        if (!parse_expression(tokens, default_value))
+        {
+            throw SyntaxError("Expected default value");
+            return false;
+        }
+    }
+
+    node = std::make_shared<TypeNode>(type, is_const, is_ref, arr_size, bitfield, std::static_pointer_cast<Expression>(default_value));
+
+    return true;
 }
 
 static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
@@ -741,21 +980,233 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
 
 static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
-    (void)tokens;
-    (void)node;
-    /// TODO: implement
-    return false;
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected punctuator on block");
+        return false;
+    }
+
+    Token next_1 = tokens.peek(0);
+
+    if (next_1.type() != TokenType::Punctuator || std::get<Punctuator>(next_1.value()) != Punctuator::OpenBrace)
+    {
+        throw SyntaxError("Expected opening brace for block");
+        return false;
+    }
+
+    tokens.pop(1);
+
+    std::shared_ptr<GenericNode> tmp;
+    std::shared_ptr<Block> block = std::make_shared<Block>();
+
+    bool is_looping = true;
+
+    while (!tokens.eof() && is_looping)
+    {
+        Token curtok = tokens.peek();
+
+        switch (curtok.type())
+        {
+        case TokenType::Identifier:
+            throw SyntaxError("Unexpected identifier: " + std::get<std::string>(curtok.value()));
+            break; // implement this
+        case TokenType::Keyword:
+            switch (std::get<jcc::Keyword>(curtok.value()))
+            {
+            case Keyword::Import:
+                if (!parse_import_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Let:
+                if (!parse_let_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Var:
+                if (!parse_var_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Volatile:
+                if (!parse_volatile_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            default:
+                throw SyntaxError("Unexpected keyword: " + std::string(lexKeywordMapReverse.at(std::get<jcc::Keyword>(curtok.value()))));
+            }
+            break;
+        case TokenType::Punctuator:
+            switch (std::get<Punctuator>(curtok.value()))
+            {
+            case Punctuator::OpenBrace:
+                throw SyntaxError("Unexpected opening brace");
+                break;
+            case Punctuator::CloseBrace:
+                is_looping = false;
+                break;
+            case Punctuator::OpenParen:
+                throw SyntaxError("Unexpected opening parenthesis");
+                break;
+            case Punctuator::CloseParen:
+                throw SyntaxError("Unexpected closing parenthesis");
+                break;
+            case Punctuator::OpenBracket:
+                throw SyntaxError("Unexpected opening bracket");
+                break;
+            case Punctuator::CloseBracket:
+                throw SyntaxError("Unexpected closing bracket");
+                break;
+            case Punctuator::Semicolon:
+                // ignore semicolons
+                tokens.pop();
+                break;
+            case Punctuator::Colon:
+                throw SyntaxError("Unexpected colon");
+                break;
+            case Punctuator::Comma:
+                throw SyntaxError("Unexpected comma");
+                break;
+            case Punctuator::Period:
+                throw SyntaxError("Unexpected period");
+                break;
+            case Punctuator::ScopeResolution:
+                throw SyntaxError("Unexpected scope resolution");
+                break;
+
+            default:
+                throw SyntaxError("Unexpected punctuator: " + std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(curtok.value()))));
+            }
+            break;
+        case TokenType::MultiLineComment:
+        case TokenType::SingleLineComment:
+        case TokenType::Whitespace:
+            tokens.pop();
+            break; // skip comments and whitespace
+        case TokenType::Raw:
+            block->push(std::make_shared<RawNode>(std::get<std::string>(curtok.value())));
+            tokens.pop();
+            break;
+        default:
+            panic("Unknown token type: " + std::to_string((int)curtok.type()));
+            break;
+        }
+    }
+
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected closing brace for block");
+        return false;
+    }
+
+    Token next_2 = tokens.peek(0);
+
+    if (next_2.type() != TokenType::Punctuator || std::get<Punctuator>(next_2.value()) != Punctuator::CloseBrace)
+    {
+        throw SyntaxError("Expected closing brace for block");
+        return false;
+    }
+
+    tokens.pop();
+
+    node = block;
+
+    return true;
 }
 
 static bool jcc::parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
-    (void)tokens;
-    (void)node;
-    /// TODO: implement
-    return false;
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected identifier after var keyword");
+        return false;
+    }
+
+    tokens.pop();
+
+    Token curtok = tokens.peek();
+    if (curtok.type() != TokenType::Identifier)
+    {
+        throw SyntaxError("Expected identifier after var keyword");
+        return false;
+    }
+    std::string name = std::get<std::string>(curtok.value());
+    tokens.pop();
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected typename after var keyword");
+        return false;
+    }
+    curtok = tokens.peek();
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+    {
+        throw SyntaxError("Expected colon after var keyword");
+        return false;
+    }
+    tokens.pop();
+
+    std::shared_ptr<TypeNode> type;
+
+    if (!parse_type(tokens, false, true, true, type))
+    {
+        throw SyntaxError("Expected typename after var keyword");
+        return false;
+    }
+
+    node = std::make_shared<VarDeclaration>(type, name);
+
+    return true;
 }
 
 static bool jcc::parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected identifier after let keyword");
+        return false;
+    }
+
+    tokens.pop();
+
+    Token curtok = tokens.peek();
+    if (curtok.type() != TokenType::Identifier)
+    {
+        throw SyntaxError("Expected identifier after let keyword");
+        return false;
+    }
+    std::string name = std::get<std::string>(curtok.value());
+    tokens.pop();
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected typename after let keyword");
+        return false;
+    }
+    curtok = tokens.peek();
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+    {
+        throw SyntaxError("Expected colon after let keyword");
+        return false;
+    }
+    tokens.pop();
+
+    std::shared_ptr<TypeNode> type;
+
+    if (!parse_type(tokens, false, true, true, type))
+    {
+        throw SyntaxError("Expected typename after let keyword");
+        return false;
+    }
+
+    node = std::make_shared<LetDeclaration>(type, name);
+
+    return true;
+}
+
+static bool jcc::parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     (void)tokens;
     (void)node;
@@ -764,14 +1215,6 @@ static bool jcc::parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::
 }
 
 static bool jcc::parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
-{
-    (void)tokens;
-    (void)node;
-    /// TODO: implement
-    return false;
-}
-
-static bool jcc::parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     (void)tokens;
     (void)node;
@@ -959,6 +1402,11 @@ static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
         }
         else
         {
+            if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Semicolon)
+            {
+                tokens.pop();
+                continue;
+            }
 
             // name
             if (curtok.type() != TokenType::Identifier)
@@ -1248,11 +1696,94 @@ static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
 
 static bool jcc::parse_union_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
 {
-    (void)tokens;
-    (void)node;
     (void)packed;
-    /// TODO: implement this
-    return false;
+    (void)node;
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected identifier after union keyword");
+        return false;
+    }
+
+    tokens.pop();
+
+    Token curtok = tokens.peek();
+    if (curtok.type() != TokenType::Identifier)
+    {
+        throw SyntaxError("Expected identifier after union keyword");
+        return false;
+    }
+    std::string name = std::get<std::string>(curtok.value());
+
+    tokens.pop();
+    if (tokens.eof())
+    {
+        node = std::make_shared<UnionDeclaration>(name);
+        return true;
+    }
+    curtok = tokens.peek();
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenBrace)
+    {
+        node = std::make_shared<UnionDeclaration>(name);
+        return true;
+    }
+    tokens.pop();
+
+    std::vector<std::shared_ptr<UnionField>> fields;
+
+    while (1)
+    {
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected closing brace in union");
+            return false;
+        }
+        std::string name;
+        curtok = tokens.peek();
+        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Semicolon)
+        {
+            tokens.pop();
+            continue;
+        }
+        else if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBrace)
+        {
+            tokens.pop();
+            break;
+        }
+        else if (curtok.type() == TokenType::Identifier)
+        {
+            name = std::get<std::string>(curtok.value());
+            tokens.pop();
+        }
+        else
+        {
+            throw SyntaxError("Expected identifier in union field");
+            return false;
+        }
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected colon in union field");
+            return false;
+        }
+        curtok = tokens.peek();
+        if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+        {
+            throw SyntaxError("Expected colon in union field");
+            return false;
+        }
+        tokens.pop();
+
+        std::shared_ptr<TypeNode> type;
+        if (!parse_type(tokens, true, true, true, type))
+        {
+            throw SyntaxError("Expected type in union field");
+            return false;
+        }
+        fields.push_back(std::make_shared<UnionField>(name, type));
+    }
+
+    node = std::make_shared<UnionDefinition>(name, fields);
+
+    return true;
 }
 
 static bool jcc::parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)

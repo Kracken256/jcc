@@ -45,6 +45,7 @@ namespace jcc
         Struct,
         Region,
         Union,
+        Packet,
 
         // Functions
         Func,
@@ -133,6 +134,7 @@ namespace jcc
         {"struct", jcc::Keyword::Struct},
         {"region", jcc::Keyword::Region},
         {"union", jcc::Keyword::Union},
+        {"packet", jcc::Keyword::Packet},
 
         {"func", jcc::Keyword::Func},
 
@@ -214,6 +216,7 @@ namespace jcc
         {jcc::Keyword::Struct, "struct"},
         {jcc::Keyword::Region, "region"},
         {jcc::Keyword::Union, "union"},
+        {jcc::Keyword::Packet, "packet"},
 
         {jcc::Keyword::Func, "func"},
 

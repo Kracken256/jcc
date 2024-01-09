@@ -23,6 +23,7 @@ namespace jcc
         Declaration,
         Definition,
         Block,
+        TypeNode,
 
         ///===================
         /// Other
@@ -52,6 +53,8 @@ namespace jcc
         StructMethod,
         StructAttribute,
         StructDefinition,
+        UnionField,
+        UnionDefinition,
         FunctionDefinition,
 
         ///===================
@@ -73,6 +76,8 @@ namespace jcc
         /// Statements
         ///===================
         ReturnStatement,
+        LetDeclaration,
+        VarDeclaration,
     };
 
     enum class VisiblityModifier
@@ -97,6 +102,45 @@ namespace jcc
         NodeType m_type;
 
         std::string json_escape(const std::string &str) const;
+    };
+
+    class Expression;
+
+    class TypeNode : public GenericNode
+    {
+    public:
+        TypeNode(NodeType type = NodeType::TypeNode) : GenericNode(type) {}
+        TypeNode(const std::string &name, bool is_const, bool is_reference, size_t arr_size, size_t bitfield, std::shared_ptr<Expression> default_value) : GenericNode(NodeType::TypeNode), m_name(name), m_is_const(is_const), m_is_reference(is_reference), m_arr_size(arr_size), m_bitfield(bitfield), m_default_value(default_value) {}
+        virtual ~TypeNode() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const bool &is_const() const { return m_is_const; }
+        bool &is_const() { return m_is_const; }
+
+        const bool &is_reference() const { return m_is_reference; }
+        bool &is_reference() { return m_is_reference; }
+
+        const size_t &arr_size() const { return m_arr_size; }
+        size_t &arr_size() { return m_arr_size; }
+
+        const size_t &bitfield() const { return m_bitfield; }
+        size_t &bitfield() { return m_bitfield; }
+
+        const std::shared_ptr<Expression> &default_value() const { return m_default_value; }
+        std::shared_ptr<Expression> &default_value() { return m_default_value; }
+
+        std::string to_string() const override { return "TypeNode(" + m_name + ")"; }
+        std::string to_json() const override;
+
+    protected:
+        std::string m_name;
+        bool m_is_const;
+        bool m_is_reference;
+        size_t m_arr_size;
+        size_t m_bitfield;
+        std::shared_ptr<Expression> m_default_value;
     };
 
     class RawNode : public GenericNode
@@ -234,7 +278,7 @@ namespace jcc
     {
     public:
         UnionDeclaration(NodeType type = NodeType::UnionDeclaration) : TypeDeclaration(type) {}
-        UnionDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::UnionDeclaration) {}
+        UnionDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::UnionDeclaration), m_name(name) {}
         virtual ~UnionDeclaration() {}
 
         const std::string &name() const { return m_name; }
@@ -252,7 +296,7 @@ namespace jcc
     {
     public:
         EnumDeclaration(NodeType type = NodeType::EnumDeclaration) : TypeDeclaration(type) {}
-        EnumDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::EnumDeclaration) {}
+        EnumDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::EnumDeclaration), m_name(name) {}
         virtual ~EnumDeclaration() {}
 
         const std::string &name() const { return m_name; }
@@ -475,6 +519,27 @@ namespace jcc
         std::vector<std::shared_ptr<StructAttribute>> m_attributes;
     };
 
+    class UnionField : public GenericNode
+    {
+    public:
+        UnionField(NodeType type = NodeType::UnionField) : GenericNode(type) {}
+        UnionField(const std::string &name, const std::shared_ptr<TypeNode> &type) : GenericNode(NodeType::UnionField), m_name(name), m_dtype(type) {}
+        virtual ~UnionField() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_dtype; }
+        std::shared_ptr<TypeNode> &dtype() { return m_dtype; }
+
+        std::string to_string() const override { return "UnionField(" + m_name + ", " + m_dtype->to_string() + ")"; }
+        std::string to_json() const override { return "{\"type\":\"union_field\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_dtype->to_json() + "}"; }
+
+    protected:
+        std::string m_name;
+        std::shared_ptr<TypeNode> m_dtype;
+    };
+
     class StructMethod : public GenericNode
     {
     public:
@@ -530,6 +595,31 @@ namespace jcc
         std::string m_name;
         std::vector<std::shared_ptr<StructField>> m_fields;
         std::vector<std::shared_ptr<StructMethod>> m_methods;
+        bool m_packed;
+    };
+
+    class UnionDefinition : public Definition
+    {
+    public:
+        UnionDefinition(NodeType type = NodeType::UnionDefinition) : Definition(type), m_packed(false) {}
+        UnionDefinition(const std::string &name, std::vector<std::shared_ptr<UnionField>> fields, bool packed = false) : Definition(NodeType::UnionDefinition), m_name(name), m_fields(fields), m_packed(packed) {}
+        virtual ~UnionDefinition() {}
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        const std::vector<std::shared_ptr<UnionField>> &fields() const { return m_fields; }
+        std::vector<std::shared_ptr<UnionField>> &fields() { return m_fields; }
+
+        const bool &packed() const { return m_packed; }
+        bool &packed() { return m_packed; }
+
+        std::string to_string() const override { return "UnionDefinition(" + m_name + ")"; }
+        std::string to_json() const override;
+
+    protected:
+        std::string m_name;
+        std::vector<std::shared_ptr<UnionField>> m_fields;
         bool m_packed;
     };
 
@@ -766,6 +856,46 @@ namespace jcc
 
     protected:
         std::shared_ptr<Expression> m_expression;
+    };
+
+    class LetDeclaration : public Statement
+    {
+    public:
+        LetDeclaration(NodeType type = NodeType::LetDeclaration) : Statement(type) {}
+        LetDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Statement(NodeType::LetDeclaration), m_type(type), m_name(name) {}
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
+        std::shared_ptr<TypeNode> &dtype() { return m_type; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        std::string to_string() const override { return "LetDeclaration()"; }
+        std::string to_json() const override;
+
+    protected:
+        std::shared_ptr<TypeNode> m_type;
+        std::string m_name;
+    };
+
+    class VarDeclaration : public Statement
+    {
+    public:
+        VarDeclaration(NodeType type = NodeType::VarDeclaration) : Statement(type) {}
+        VarDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Statement(NodeType::VarDeclaration), m_type(type), m_name(name) {}
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
+        std::shared_ptr<TypeNode> &dtype() { return m_type; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        std::string to_string() const override { return "VarDeclaration()"; }
+        std::string to_json() const override;
+
+    protected:
+        std::shared_ptr<TypeNode> m_type;
+        std::string m_name;
     };
 }
 

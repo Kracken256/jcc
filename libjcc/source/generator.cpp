@@ -149,6 +149,49 @@ static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::Gene
     return result;
 }
 
+static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
+{
+    (void)_subsystem;
+
+    std::string result = mkpadding(indent);
+
+    auto letdef = std::static_pointer_cast<LetDeclaration>(node);
+    auto type = letdef->dtype();
+
+    if (type->is_const())
+    {
+        result += "const ";
+    }
+    if (type->arr_size() == std::numeric_limits<uint64_t>::max())
+    {
+        result += "std::vector<" + rectify_type(type->name()) + ">";
+    }
+    else if (type->arr_size() > 0)
+    {
+        result += "std::array<" + rectify_type(type->name()) + ", " + std::to_string(type->arr_size()) + "> ";
+    }
+    else
+    {
+        result += rectify_type(type->name());
+    }
+
+    if (type->is_reference() || (!type->is_reference() || type->is_const()))
+    {
+        result += "&";
+    }
+
+    result += " " + rectify_name(letdef->name());
+
+    if (type->default_value())
+    {
+        result += " = " + generate_node_cxx(type->default_value(), indent, _subsystem);
+    }
+
+    result += ";\n";
+
+    return result;
+}
+
 static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto param = std::static_pointer_cast<FunctionParameter>(node);
@@ -514,6 +557,45 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
     return result;
 }
 
+static std::string generate_union_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
+{
+    (void)_subsystem;
+
+    auto uniondef = std::static_pointer_cast<UnionDefinition>(node);
+    std::string result = mkpadding(indent) + "union " + rectify_name(uniondef->name()) + "\n" + mkpadding(indent) + "{\n";
+
+    indent += INDENT_SIZE;
+
+    for (const auto &field : uniondef->fields())
+    {
+        auto dtype = field->dtype();
+        result += mkpadding(indent) + rectify_type(dtype->name()) + " " + rectify_name(field->name());
+
+        if (dtype->arr_size() > 0)
+        {
+            result += "[" + std::to_string(dtype->arr_size()) + "]";
+        }
+
+        if (dtype->bitfield() > 0)
+        {
+            result += " : " + std::to_string(dtype->bitfield());
+        }
+
+        if (dtype->default_value())
+        {
+            result += " = " + generate_node_cxx(dtype->default_value(), indent, _subsystem);
+        }
+
+        result += ";\n";
+    }
+
+    indent -= INDENT_SIZE;
+
+    result += mkpadding(indent) + "};\n\n";
+
+    return result;
+}
+
 static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto funcdef = std::static_pointer_cast<FunctionDefinition>(node);
@@ -643,6 +725,10 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return generate_union_declaration_cxx(node, indent, _subsystem);
     case NodeType::EnumDeclaration:
         return generate_enum_declaration_cxx(node, indent, _subsystem);
+
+    case NodeType::LetDeclaration:
+        return generate_let_declaration_cxx(node, indent, _subsystem);
+
     case NodeType::FunctionDeclaration:
         return generate_function_declaration_cxx(node, indent, _subsystem);
     case NodeType::ClassDeclaration:
@@ -658,6 +744,8 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return generate_struct_definition_cxx(node, indent, _subsystem);
     case NodeType::StructMethod:
         return generate_struct_method_cxx(node, indent, _subsystem);
+    case NodeType::UnionDefinition:
+        return generate_union_definition_cxx(node, indent, _subsystem);
     case NodeType::FunctionDefinition:
         return generate_function_definition_cxx(node, indent, _subsystem);
 
@@ -1100,8 +1188,8 @@ bool jcc::CompilationUnit::join_to_output_cxx(const std::vector<std::pair<std::s
     if (g_has_main)
     {
         output_cxx_stream << "\nint main(int argc, char **argv)\n{\n";
-        output_cxx_stream << mkpadding(INDENT_SIZE) << "std::vector<std::string> args(argv, argv + argc);\n";
-        output_cxx_stream << mkpadding(INDENT_SIZE) << "return Main(args);\n";
+        output_cxx_stream << mkpadding(INDENT_SIZE) << "std::vector<_string> args(argv, argv + argc);\n";
+        output_cxx_stream << mkpadding(INDENT_SIZE) << "return _Main(args);\n";
         output_cxx_stream << "}\n";
     }
     g_has_main_mutex.unlock();
