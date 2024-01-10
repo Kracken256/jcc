@@ -33,63 +33,99 @@ The target features of this new language are:
 
 J++ is very similar to C++ in features and was greatly inspired by it. J++ compiles directly to C++ code and enjoys the performance benefits of C++ and existing C++ compilers. This also means that virtually any platform or architecture that C++ compiles to, J++ can compile to as well. This also means that J++ can interop with C++ code and libraries.
 
-J++ has a more modern syntax. Here are some examples:
-
-Define a struct:
-There is no need for semi-colons.
+J++ has a more modern syntax. Here are some examples of what the language will look like:
 
 ```c++
 struct Point {
-    x: int
-    y: int
+    x: int = 0
+    y: int = 0
 }
 ```
 
-Define a class:
-Constructors and destructors are defined with the `constructor` and `destructor` keywords, respectively.
-Exported members/methods and constructors are public. Non-exported items are private.
-This class inherits from the `IDisposable` interface.
-
 ```c++
-namespace net {
-    class client : IDisposable {
-        constructor(target: string, port?: int, timeout?: int, protocol?: string) {
-            // ...
+// Create a struct with attributes for runtime reflection.
+// Instead of namespaces, J++ uses subsystems
+// A subsystem is a namespace with optional 'tags' that represent dependencies.
+// This allows for creating directed-acyclic-graphs of source code automatically.
+// And helps plan out changes to the codebase without breaking things.
+subsystem Std::Types: Std::Core::Exception {
+    struct uuid_t {
+        @:serial_format('hex')
+        @:endian('big')
+        @:serial_suffix('-')
+        a: dword = 0
+
+        @:serial_format('hex')
+        @:endian('big')
+        @:serial_suffix('-')
+        b: word = 0
+
+        @:serial_format('hex')
+        @:endian('big')
+        @:serial_suffix('-')
+        c: word = 0
+
+        @:serial_format('hex')
+        @:endian('big')
+        @:serial_suffix('-')
+        d: word = 0
+
+        @:serial_format('hex')
+        @:endian('big')
+        e: dword = 0
+        @:serial_format('hex')
+        @:endian('big')
+        f: word = 0;
+
+        new: (str:string): uuid_t {
+            let uuid: uuid_t = uuid_t()
+            uuid.parse(str)
+            return uuid
         }
 
-        destructor() {
-            net.close()
+        new: (a: dword, b: word, c: word, d: word, e: dword, f: word): uuid_t {
+            return uuid_t(a: a, b: b, c: c, d: d, e: e, f: f)
         }
 
-        export func write(data: buffer) -> nint {
-            // ...
+        parse: (str: string): void {
+            let parts: string[] = str.split('-')
+            if (parts.length != 5) {
+                throw new Exception("Invalid UUID format")
+            }
+
+            a = parts[0].hex('big')
+            b = parts[1].hex('big')
+            c = parts[2].hex('big')
+            d = parts[3].hex('big')
+            e = parts[4].hex('big')
         }
 
-        export func read(data: buffer) -> nint {
-            // ...
+        raw: (endian: string = 'big'): byte[] {
+            let bytes: byte[] = byte[16]
+            bytes[0:4] = a.raw(endian)
+            bytes[4:6] = b.raw(endian)
+            bytes[6:8] = c.raw(endian)
+            bytes[8:10] = d.raw(endian)
+            bytes[10:16] = e.raw(endian)
+            return bytes
         }
 
-        export func close() {
-            // ...
+        toString: (): string {
+            return a.hex('big') + '-' + b.hex('big') + '-' + c.hex('big') + '-' + d.hex('big') + '-' + e.hex('big')
         }
-
-        socket: dword
     }
 }
 ```
 
-Define a function:
-Functions can be made anonymous like in javascript. The `func` keyword is required for named functions.
-
 ```c++
-import stdio
+import stdio as . // import all exported contents into global scope
 
-func add(a: int, b: int) -> int {
+func add(a: int, b: int = 80): int {
     return a + b
 }
 
 func main() {
-    let myAnonymousFunc = (a: int) -> int {
+    let myAnonymousFunc = (a: int): int {
         let b: int = 10
         return add(a, b)
     }
@@ -100,6 +136,30 @@ func main() {
 }
 ```
 
+More:
+
+```c++
+import stdio as io // import a module and give it an alias
+
+@:require(!!name) // Require that the name parameter is not null or empty
+// Define a cast map for exporting this function to C
+@:export_cast_map('[string, const char*(($).raw()), string(*)], [uuid_t, byte[16](($).raw()), uuid_t(a:*[0:4], b:*[4:6], c:*[6:8], d:*[8:10], e:*[10:16])]') 
+export "C" func uuid5_new(name: string, namespace: uuid_t): uuid_t {
+    import crypto // import a module into the current scope
+
+    // The crypto module is mananged and there is no need to free it.
+    let hash: string = crypto.sha1(name.raw('big') + namespace.raw('big'))
+    
+    return uuid_t(hash[0:4].hex('big'), hash[4:6].hex('big'), hash[6:8].hex('big'), hash[8:10].hex('big'), hash[10:16].hex('big'))
+}
+
+func main() {
+    let uuid: uuid_t = uuid5_new("Hello World", uuid_t::new("6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
+    io.print(uuid)
+
+    // code is fun
+}
+```
 
 ---
 
