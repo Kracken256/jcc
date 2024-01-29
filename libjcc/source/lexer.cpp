@@ -309,7 +309,6 @@ static std::vector<std::pair<const char *, unsigned int>> lexPunctuators = {
     {"]", 1},  // right bracket
     {";", 1},  // semicolon
     {",", 1},  // comma
-    {"::", 2}, // scope resolution
     {":", 1},  // colon
     {".", 1},  // dot
 };
@@ -700,6 +699,10 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                     case 1:
                         if (current_char == sep.first[0])
                         {
+                            if (src_length - i >= 2 && source[i+1] == ':')
+                            {
+                                break;
+                            }
                             result.push_back(Token(TokenType::Punctuator, lexPunctuatorMap.at(sep.first)));
                             found = true;
                         }

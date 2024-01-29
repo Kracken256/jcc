@@ -451,24 +451,11 @@ void jcc::CompilationUnit::reset_instance()
 
 bool jcc::CompilationUnit::build()
 {
-    const char *env_jcc_helper, *env_jcc_ld;
     std::vector<std::string> cxx_flags, ld_flags;
     std::string cxx_output, objpath;
     std::vector<std::pair<std::string, std::string>> sources;
 
     this->m_success = false;
-
-    if ((env_jcc_helper = std::getenv("JCC_CXX")) == NULL)
-    {
-        this->push_message(CompilerMessageType::Error, "JCC_CXX environment variable not set. Unable to compile generated C++ code. Set the variable to the path of a compatible C++ compiler.");
-        return false;
-    }
-
-    if ((env_jcc_ld = std::getenv("JCC_LD")) == NULL)
-    {
-        this->push_message(CompilerMessageType::Error, "JCC_LD environment variable not set. Unable to link generated object files. Set the variable to the path of a compatible linker.");
-        return false;
-    }
 
     for (const auto &file : this->m_files)
     {
@@ -545,7 +532,7 @@ bool jcc::CompilationUnit::build()
     cxx_flags.push_back("-Werror");
     cxx_flags.push_back("-Wno-unused-parameter");
 
-    if (!invoke_jcc_helper_cxx2obj(cxx_output, objpath, cxx_flags, env_jcc_helper))
+    if (!invoke_jcc_helper_cxx2obj(cxx_output, objpath, cxx_flags, "c++"))
     {
         this->push_message(CompilerMessageType::Error, "Downstream c++ compilation failed. Failed to build generated C++ code.");
         return false;
@@ -569,7 +556,7 @@ bool jcc::CompilationUnit::build()
     ld_flags.push_back("-Wl,--strip-all");
     ld_flags.push_back("-Wl,--no-undefined");
 
-    if (!invoke_jcc_helper_ld(objpath, m_output_file, ld_flags, env_jcc_ld))
+    if (!invoke_jcc_helper_ld(objpath, m_output_file, ld_flags, "c++"))
     {
         this->push_message(CompilerMessageType::Error, "Downstream linking failed. Failed to link generated object files.");
         return false;
@@ -781,6 +768,13 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         this->push_message(CompilerMessageType::Error, "Internal compiler error: Lexer::lex(" + std::string(e.what()) + ")");
         panic("Caught unexpected exception in Lexer::lex()");
         return false;
+    }
+
+    std::ofstream lexOut(file + ".lex.json");
+    if (lexOut.is_open())
+    {
+        lexOut << tokens.to_json();
+        lexOut.close();
     }
 
     std::shared_ptr<AbstractSyntaxTree> ast;

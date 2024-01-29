@@ -2,9 +2,9 @@
 // Info: J++ Transpiled Code                                        //
 // Type: C++-20                                                     //
 // Version: J++-dev                                                 //
-// Sources: ["tests/func-declare.j"]                                //
+// Sources: ["tests/complex-struct.j"]                              //
 // Platform: independent                                            //
-// Date: 2024-01-09T07:30:30 +0000 GMT                              //
+// Date: 2024-01-29T23:42:41 +0000 GMT                              //
 // Copyright (C) 2023 Wesley C. Jones. All rights reserved.         //
 //==================================================================//
 
@@ -79,8 +79,8 @@ typedef void *_routine;
 /* Begin Generic Structure Base Class */
 typedef _qword typeid_t;
 
-static std::map<typeid_t, _string> g_typenames_mapping = {{0, "__common::::_uuid_t"}};
-static std::map<_string, typeid_t> g_typenames_mapping_reverse = {{"__common::::_uuid_t", 0}};
+static std::map<typeid_t, _string> g_typenames_mapping = {{0, "_std::_io::Reader"}, {1, "_libmia::_Format::MIAHeader"}, {2, "_libmia::_Parser::Context"}};
+static std::map<_string, typeid_t> g_typenames_mapping_reverse = {{"_std::_io::Reader", 0}, {"_libmia::_Format::MIAHeader", 1}, {"_libmia::_Parser::Context", 2}};
 static std::map<std::string, _uintn> g_builtin_sizes = {{"_bool", 1}, {"_byte", 1}, {"_char", 1}, {"_word", 2}, {"_short", 2}, {"_dword", 4}, {"_int", 4}, {"_float", 4}, {"_double", 8}, {"_qword", 8}, {"_long", 8}, {"_string", 8}, {"_routine", 8}, {"_address", 8}};
 struct ReflectiveEntry {
     _string field_name;
@@ -88,7 +88,7 @@ struct ReflectiveEntry {
     _uintn count;
 };
 
-static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {{0, {{"_a", "_dword", 1}, {"_b", "_word", 1}, {"_c", "_word", 1}, {"_d", "_word", 1}, {"_e", "_dword", 1}, {"_f", "_word", 1}}}};
+static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {{1, {{"_magic", "_dword", 1}, {"_version", "_word", 1}, {"_progid", "_byte", 16}, {"_camid", "_byte", 16}, {"_quality_index", "_byte", 1}, {"_colormode", "_word", 1}, {"_width", "_dword", 1}, {"_height", "_dword", 1}, {"_span", "_dword", 1}, {"_pxsize", "_byte", 1}, {"_compmode", "_byte", 1}, {"_usize", "_dword", 1}, {"_oid", "_byte", 16}, {"_pgid", "_byte", 16}, {"_timestamp", "_qword", 1}, {"_crc32", "_dword", 1}, {"_reserved", "_byte", 25}}}, {2, {{"_header", "_Format::_MIAHeader", 1}, {"_src", "_std::_io::_Reader", 1}}}};
 
 template <typeid_t T>
 class StructGeneric
@@ -199,72 +199,109 @@ template <typeid_t T>
 const typeid_t StructGeneric<T>::m_typeid;
 /* End Generic Structure Base Class */
 //==================================================================//
-// File: "tests/func-declare.j" //
+// File: "tests/complex-struct.j" //
 //==================================================================//
 
 /* [] */
-namespace _common
+namespace _std
 {
-    /* Begin Structure _uuid_t */
-    #pragma pack(push, 1)
-    class _uuid_t : public StructGeneric<0>
+    /* [] */
+    namespace _io
     {
-    public:
-        _uuid_t()
+        /* Begin Structure _Reader */
+        class _Reader : public StructGeneric<0>
         {
-            /* attributes for field _a */
-            this->_set("_a_serial_format", "hex");
-            this->_set("_a_endian", "big");
-            this->_set("_a_serial_suffix", "-");
+        public:
+            _Reader()
+            {
+                /* auto-generated attributes */
+                this->_set("_index", "");
+                this->_set("_index_names", "");
+                this->_set("_index_types", "");
+            }
 
-            /* attributes for field _b */
-            this->_set("_b_serial_format", "hex");
-            this->_set("_b_endian", "big");
-            this->_set("_b_serial_suffix", "-");
+        };
+        constexpr auto j__Reader_size = sizeof(_Reader);
+        /* End Structure _Reader */
 
-            /* attributes for field _c */
-            this->_set("_c_serial_format", "hex");
-            this->_set("_c_endian", "big");
-            this->_set("_c_serial_suffix", "-");
+    }
 
-            /* attributes for field _d */
-            this->_set("_d_serial_format", "hex");
-            this->_set("_d_endian", "big");
-            this->_set("_d_serial_suffix", "-");
+}
 
-            /* attributes for field _e */
-            this->_set("_e_serial_format", "hex");
-            this->_set("_e_endian", "big");
+/* [] */
+namespace _libmia
+{
+    /* [] */
+    namespace _Format
+    {
+        /* Begin Structure _MIAHeader */
+        #pragma pack(push, 1)
+        class _MIAHeader : public StructGeneric<1>
+        {
+        public:
+            _MIAHeader()
+            {
+                /* auto-generated attributes */
+                this->_set("_index", "_magic:_dword=0,_version:_word=0,_progid:std::vector<_byte>,_camid:std::vector<_byte>,_quality_index:_byte=0,_colormode:_word=0,_width:_dword=0,_height:_dword=0,_span:_dword=0,_pxsize:_byte=0,_compmode:_byte=0,_usize:_dword=0,_oid:std::vector<_byte>,_pgid:std::vector<_byte>,_timestamp:_qword=0,_crc32:_dword=0,_reserved:std::vector<_byte>,");
+                this->_set("_index_names", "_magic,_version,_progid,_camid,_quality_index,_colormode,_width,_height,_span,_pxsize,_compmode,_usize,_oid,_pgid,_timestamp,_crc32,_reserved,");
+                this->_set("_index_types", "_dword=0,_word=0,std::vector<_byte>,std::vector<_byte>,_byte=0,_word=0,_dword=0,_dword=0,_dword=0,_byte=0,_byte=0,_dword=0,std::vector<_byte>,std::vector<_byte>,_qword=0,_dword=0,std::vector<_byte>,");
+            }
 
-            /* attributes for field _f */
-            this->_set("_f_serial_format", "hex");
-            this->_set("_f_endian", "big");
+            _dword _magic = 0;
+            _word _version = 0;
+            _byte _progid[16];
+            _byte _camid[16];
+            _byte _quality_index = 0;
+            _word _colormode = 0;
+            _dword _width = 0;
+            _dword _height = 0;
+            _dword _span = 0;
+            _byte _pxsize = 0;
+            _byte _compmode = 0;
+            _dword _usize = 0;
+            _byte _oid[16];
+            _byte _pgid[16];
+            _qword _timestamp = 0;
+            _dword _crc32 = 0;
+            _byte _reserved[25];
+        };
+        #pragma pack(pop)
+        constexpr auto j__MIAHeader_size = sizeof(_MIAHeader);
+        /* End Structure _MIAHeader */
 
-            /* auto-generated attributes */
-            this->_set("_index", "_a:_dword=0,_b:_word=0,_c:_word=0,_d:_word=0,_e:_dword=0,_f:_word=0,");
-            this->_set("_index_names", "_a,_b,_c,_d,_e,_f,");
-            this->_set("_index_types", "_dword=0,_word=0,_word=0,_word=0,_dword=0,_word=0,");
-        }
+    }
 
-        _dword _a = 0;
-        _word _b = 0;
-        _word _c = 0;
-        _word _d = 0;
-        _dword _e = 0;
-        _word _f = 0;
-    };
-    #pragma pack(pop)
-    constexpr auto j__uuid_t_size = sizeof(_uuid_t);
-    /* End Structure _uuid_t */
+    /* ["_libmia::_Format", "_std::io"] */
+    namespace _Parser
+    {
+        /* Begin Structure _Context */
+        class _Context : public StructGeneric<2>
+        {
+        public:
+            _Context()
+            {
+                /* auto-generated attributes */
+                this->_set("_index", "_header:_Format::_MIAHeader,_src:_std::_io::_Reader,");
+                this->_set("_index_names", "_header,_src,");
+                this->_set("_index_types", "_Format::_MIAHeader,_std::_io::_Reader,");
+            }
+
+            _Format::_MIAHeader _header;
+            _std::_io::_Reader _src;
+        };
+        constexpr auto j__Context_size = sizeof(_Context);
+        /* End Structure _Context */
+
+    }
 
 }
 
 //==================================================================//
-// EOF: "tests/func-declare.j"                                      //
+// EOF: "tests/complex-struct.j"                                    //
 //==================================================================//
 
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// 229940766ade0a2c9029145d18e0961c0db1010f26b83fb7c467be5bbc27681e //
+// 4b9f51f583293791ce944b56bd4c67ace154e259cba719664187308d0c9f86fe //
 //==================================================================//

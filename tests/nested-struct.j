@@ -1,5 +1,5 @@
 
-namespace App {
+subsystem App {
     struct Color {
         r: long = 0
         g: long = 0
@@ -33,11 +33,10 @@ namespace App {
 
     struct Text {
         tl: Point
-        text: string = "Your text here"
+        text: string = "Your \ntext here"
         color: Color
     }
 }
 
-func get_return_value(x:int) -> dword {
-    return 42
+func Main(args: string[]): void {
 }

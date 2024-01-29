@@ -934,9 +934,6 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
             case Punctuator::Period:
                 throw SyntaxError("Unexpected period");
                 break;
-            case Punctuator::ScopeResolution:
-                throw SyntaxError("Unexpected scope resolution");
-                break;
 
             default:
                 throw SyntaxError("Unexpected punctuator: " + std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(curtok.value()))));
@@ -1073,9 +1070,6 @@ static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<
                 break;
             case Punctuator::Period:
                 throw SyntaxError("Unexpected period");
-                break;
-            case Punctuator::ScopeResolution:
-                throw SyntaxError("Unexpected scope resolution");
                 break;
 
             default:

@@ -29,7 +29,6 @@ namespace jcc
     enum class Keyword
     {
         // Namespaces
-        Namemap,
         Subsystem,
 
         // Symbols import/export
@@ -79,6 +78,10 @@ namespace jcc
         Do,
         Switch,
         Return,
+        Retif,
+        Retz,
+        Retnz,
+        Abortif,
         Case,
         Break,
         Default,
@@ -120,7 +123,6 @@ namespace jcc
     };
 
     const std::map<const char *, jcc::Keyword> lexKeywordMap = {
-        {"namemap", jcc::Keyword::Namemap},
         {"subsystem", jcc::Keyword::Subsystem},
 
         {"import", jcc::Keyword::Import},
@@ -202,7 +204,6 @@ namespace jcc
         {"null", jcc::Keyword::Null}};
 
     const std::map<jcc::Keyword, const char *> lexKeywordMapReverse = {
-        {jcc::Keyword::Namemap, "namemap"},
         {jcc::Keyword::Subsystem, "subsystem"},
 
         {jcc::Keyword::Import, "import"},
@@ -295,7 +296,6 @@ namespace jcc
         Colon,
         Comma,
         Period,
-        ScopeResolution,
     };
 
     const std::map<const char *, jcc::Punctuator> lexPunctuatorMap = {
@@ -308,8 +308,7 @@ namespace jcc
         {";", jcc::Punctuator::Semicolon},
         {":", jcc::Punctuator::Colon},
         {",", jcc::Punctuator::Comma},
-        {".", jcc::Punctuator::Period},
-        {"::", jcc::Punctuator::ScopeResolution}};
+        {".", jcc::Punctuator::Period}};
 
     const std::map<jcc::Punctuator, const char *> lexPunctuatorMapReverse = {
         {jcc::Punctuator::OpenParen, "("},
@@ -321,8 +320,7 @@ namespace jcc
         {jcc::Punctuator::Semicolon, ";"},
         {jcc::Punctuator::Colon, ":"},
         {jcc::Punctuator::Comma, ","},
-        {jcc::Punctuator::Period, "."},
-        {jcc::Punctuator::ScopeResolution, "::"}};
+        {jcc::Punctuator::Period, "."},};
 
     enum class Operator
     {

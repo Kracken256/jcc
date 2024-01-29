@@ -39,6 +39,11 @@ uint32_t unix_timestamp();
 
 static std::string rectify_name(const std::string &name)
 {
+    if (name.starts_with("::"))
+    {
+        return "::_" + name.substr(2);
+    }
+
     return "_" + name;
 }
 
@@ -62,12 +67,75 @@ static std::string rectify_type(const std::string &type)
         string += tmp[i];
     }
 
+    if (string.starts_with("_::"))
+    {
+        return string.substr(3);
+    }
+
     return string;
+}
+
+static std::string string_escape_string(const std::string &s)
+{
+    std::string result;
+    for (size_t i = 0; i < s.size(); i++)
+    {
+        if ((i == 0 || i == s.size() - 1) && s[i] == '\"')
+        {
+            result += "\"";
+            continue;
+        }
+        switch (s[i])
+        {
+        case '\n':
+            result += "\\n";
+            break;
+        case '\r':
+            result += "\\r";
+            break;
+        case '\t':
+            result += "\\t";
+            break;
+        case '\v':
+            result += "\\v";
+            break;
+        case '\b':
+            result += "\\b";
+            break;
+        case '\f':
+            result += "\\f";
+            break;
+        case '\a':
+            result += "\\a";
+            break;
+        case '\\':
+            result += "\\\\";
+            break;
+        case '\'':
+            result += "\\\'";
+            break;
+        case '\"':
+            result += "\\\"";
+            break;
+        default:
+            result += s[i];
+            break;
+        }
+    }
+    return result;
 }
 
 static std::string get_qualified_typename(const std::string &name, const std::string &_subsystem)
 {
-    return rectify_name(_subsystem) + "::" + rectify_name(name);
+    if (_subsystem.empty())
+    {
+        return name;
+    }
+    if (name.starts_with("::_"))
+    {
+        return name.substr(2);
+    }
+    return _subsystem + "::" + name;
 }
 
 static std::string mkpadding(uint32_t indent)
@@ -175,7 +243,7 @@ static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::Gener
         result += rectify_type(type->name());
     }
 
-    if (type->is_reference() || (!type->is_reference() || type->is_const()))
+    if (type->is_reference())
     {
         result += "&";
     }
@@ -184,7 +252,7 @@ static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::Gener
 
     if (type->default_value())
     {
-        result += " = " + generate_node_cxx(type->default_value(), indent, _subsystem);
+        result += " = " + string_escape_string(generate_node_cxx(type->default_value(), indent, _subsystem));
     }
 
     result += ";\n";
@@ -199,13 +267,13 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
 
     if (param->arr_size() == std::numeric_limits<uint64_t>::max())
     {
-        if (!param->is_reference() || param->is_const())
+        if (param->is_const() || !param->is_reference())
         {
             result += "const ";
         }
 
         result += "std::vector<" + rectify_type(param->type()) + ">";
-        if (param->is_reference() || (!param->is_reference() || param->is_const()))
+        if (param->is_reference() || (param->is_const() || !param->is_reference()))
         {
             result += "&";
         }
@@ -221,13 +289,13 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
     }
     else
     {
-        if (!param->is_reference() || param->is_const())
+        if (param->is_const())
         {
             result += "const ";
         }
 
         result += rectify_type(param->type());
-        if (param->is_reference() || (!param->is_reference() || param->is_const()))
+        if (param->is_reference())
         {
             result += "&";
         }
@@ -236,7 +304,7 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
 
     if (param->default_value())
     {
-        result += " = " + generate_node_cxx(param->default_value(), indent, _subsystem);
+        result += " = " + string_escape_string(generate_node_cxx(param->default_value(), indent, _subsystem));
     }
 
     return result;
@@ -326,7 +394,7 @@ static std::string generate_subsystem_declaration_cxx(const std::shared_ptr<jcc:
     result += mkpadding(indent) + "/* [";
     for (size_t i = 0; i < subsysdecl->dependencies().size(); i++)
     {
-        result += "\"" + rectify_name(subsysdecl->dependencies()[i]) + "\"";
+        result += "\"" + get_qualified_typename(rectify_name(subsysdecl->dependencies()[i]), _subsystem) + "\"";
         if (i != subsysdecl->dependencies().size() - 1)
         {
             result += ", ";
@@ -342,14 +410,13 @@ static std::string generate_subsystem_declaration_cxx(const std::shared_ptr<jcc:
 static std::string generate_subsystem_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto subsysdef = std::static_pointer_cast<SubsystemDefinition>(node);
-    std::string ns_name = rectify_name(subsysdef->name());
 
     std::string result;
 
     result += mkpadding(indent) + "/* [";
     for (size_t i = 0; i < subsysdef->dependencies().size(); i++)
     {
-        result += "\"" + rectify_name(subsysdef->dependencies()[i]) + "\"";
+        result += "\"" + get_qualified_typename(rectify_name(subsysdef->dependencies()[i]), _subsystem) + "\"";
         if (i != subsysdef->dependencies().size() - 1)
         {
             result += ", ";
@@ -357,13 +424,15 @@ static std::string generate_subsystem_definition_cxx(const std::shared_ptr<jcc::
     }
     result += "] */\n";
 
-    result += mkpadding(indent) + "namespace " + ns_name + "\n";
+    result += mkpadding(indent) + "namespace " + rectify_name(subsysdef->name()) + "\n";
 
-    _subsystem += ns_name + "::";
+    std::string tmp = _subsystem;
+
+    _subsystem = get_qualified_typename(rectify_name(subsysdef->name()), _subsystem);
 
     result += generate_block_cxx(subsysdef->block(), indent, _subsystem) + "\n";
 
-    _subsystem = _subsystem.substr(0, _subsystem.size() - ns_name.size() - 2);
+    _subsystem = tmp;
 
     return result;
 }
@@ -445,7 +514,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
         for (const auto &attribute : field->attributes())
         {
-            result += mkpadding(indent) + "this->_set(\"" + rectify_name(field->name()) + "_" + attribute->name() + "\", " + attribute->value() + ");\n";
+            result += mkpadding(indent) + "this->_set(\"" + rectify_name(field->name()) + "_" + attribute->name() + "\", " + string_escape_string(attribute->value()) + ");\n";
         }
 
         result += "\n";
@@ -481,7 +550,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
         }
         if (!field->default_value().empty())
         {
-            typetmp += "=" + field->default_value();
+            typetmp += "=" + string_escape_string(field->default_value());
         }
 
         index += rectify_name(field->name()) + ":" + typetmp;
@@ -492,8 +561,8 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
     }
 
     auto_attributes.insert({"_index_names", "\"" + index_names + "\""});
-    auto_attributes.insert({"_index_types", "\"" + index_types + "\""});
-    auto_attributes.insert({"_index", "\"" + index + "\""});
+    auto_attributes.insert({"_index_types", "\"" + string_escape_string(index_types) + "\""});
+    auto_attributes.insert({"_index", "\"" + string_escape_string(index) + "\""});
 
     for (const auto &attr : auto_attributes)
     {
@@ -527,7 +596,7 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
 
             if (!field->default_value().empty())
             {
-                result += " = " + field->default_value();
+                result += " = " + string_escape_string(field->default_value());
             }
         }
         else
