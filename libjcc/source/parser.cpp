@@ -11,7 +11,6 @@
 ///=============================================================================
 namespace jcc
 {
-
     enum class FunctionParseMode
     {
         DeclarationOnly,
@@ -69,29 +68,38 @@ namespace jcc
             return print_tree(*this, "", true, "");
         }
     };
-
 }
 
 static bool is_builtin_type(const std::string &type)
 {
-    // integers and floating point numbers
-    if (type == "bool" || type == "byte" || type == "char" || type == "word" || type == "short" || type == "dword" || type == "int" || type == "qword" || type == "long" || type == "float" || type == "double" || type == "intn" || type == "uintn" || type == "address" || type == "routine")
-    {
-        return true;
-    }
+    static std::set<const char *> builtin_types = {
+        "bit",
+        "byte",
+        "char",
+        "word",
+        "short",
+        "dword",
+        "int",
+        "qword",
+        "long",
+        "intn",
+        "uintn",
 
-    if (type == "void" || type == "null")
-    {
-        return true;
-    }
+        "float",
+        "double",
 
-    // complex types
-    if (type == "bigfloat" || type == "bigint" || type == "biguint" || type == "arbint" || type == "arbuint" || type == "real" || type == "complex" || type == "string" || type == "map" || type == "tensor")
-    {
-        return true;
-    }
+        "address",
+        "routine",
 
-    return false;
+        "real",
+        "complex",
+
+        "string",
+
+        "void",
+    };
+
+    return builtin_types.contains(type.c_str());
 }
 
 ///=============================================================================
@@ -156,18 +164,6 @@ std::string jcc::StructDeclaration::to_json() const
     return str;
 }
 
-std::string jcc::UnionDeclaration::to_json() const
-{
-    std::string str = "{\"type\":\"union_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
-    return str;
-}
-
-std::string jcc::EnumDeclaration::to_json() const
-{
-    std::string str = "{\"type\":\"enum_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
-    return str;
-}
-
 std::string jcc::FunctionParameter::to_json() const
 {
     std::string str = "{\"type\":\"function_parameter\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":\"" + json_escape(m_type) + "\"}";
@@ -186,12 +182,6 @@ std::string jcc::FunctionDeclaration::to_json() const
         str.pop_back();
     }
     str += "]}";
-    return str;
-}
-
-std::string jcc::ClassDeclaration::to_json() const
-{
-    std::string str = "{\"type\":\"class_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
     return str;
 }
 
@@ -270,21 +260,6 @@ std::string jcc::StructDefinition::to_json() const
     return str;
 }
 
-std::string jcc::UnionDefinition::to_json() const
-{
-    std::string str = "{\"type\":\"union_definition\",\"name\":\"" + json_escape(m_name) + "\",\"fields\":[";
-    for (const auto &child : m_fields)
-    {
-        str += child->to_json() + ",";
-    }
-    if (m_fields.size() > 0)
-    {
-        str.pop_back();
-    }
-    str += "]}";
-    return str;
-}
-
 std::string jcc::FunctionDefinition::to_json() const
 {
     std::string str = "{\"type\":\"function_definition\",\"name\":\"" + json_escape(m_name) + "\",\"return_type\":\"" + json_escape(m_return_type) + "\",\"parameters\":[";
@@ -317,7 +292,7 @@ std::string jcc::CallExpression::to_json() const
 
 std::string jcc::TypeNode::to_json() const
 {
-    std::string str = "{\"type\":\"type_node\",\"name\":\"" + json_escape(m_name) + "\",\"is_const\":" + std::to_string(m_is_const) + ",\"is_ref\":" + std::to_string(m_is_reference) + ",";
+    std::string str = "{\"type\":\"type_node\",\"name\":\"" + json_escape(m_typename) + "\",\"is_mutable\":" + std::to_string(m_is_mutable) + ",\"is_ref\":" + std::to_string(m_is_reference) + ",";
     if (m_arr_size == std::numeric_limits<size_t>::max())
     {
         str += "\"arr_size\":\"dynamic\"";
@@ -350,10 +325,16 @@ std::string jcc::VarDeclaration::to_json() const
     return str;
 }
 
+std::string jcc::ConstDeclaration::to_json() const
+{
+    std::string str = "{\"type\":\"const_declaration\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_type->to_json() + "}";
+
+    return str;
+}
+
 namespace jcc
 {
 
-    static bool parse_union_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
     static bool parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
     static bool parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_enum_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
@@ -369,6 +350,7 @@ namespace jcc
     static bool parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
+    static bool parse_const_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
@@ -612,6 +594,11 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                     return false;
                 block->push(tmp);
                 break;
+            case Keyword::Const:
+                if (!parse_const_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
 
             case Keyword::Struct:
                 if (!parse_struct_keyword(tokens, tmp, false))
@@ -620,11 +607,6 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                 break;
             case Keyword::Region:
                 if (!parse_struct_keyword(tokens, tmp, true))
-                    return false;
-                block->push(tmp);
-                break;
-            case Keyword::Union:
-                if (!parse_union_keyword(tokens, tmp, false))
                     return false;
                 block->push(tmp);
                 break;
@@ -784,6 +766,11 @@ static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<
                 break;
             case Keyword::Var:
                 if (!parse_var_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+            case Keyword::Const:
+                if (!parse_const_keyword(tokens, tmp))
                     return false;
                 block->push(tmp);
                 break;
@@ -957,6 +944,50 @@ static bool jcc::parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::
     }
 
     node = std::make_shared<LetDeclaration>(type, name);
+
+    return true;
+}
+
+static bool jcc::parse_const_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
+{
+    if (tokens.size() < 2)
+    {
+        throw SyntaxError("Expected identifier after const keyword");
+        return false;
+    }
+
+    tokens.pop();
+
+    Token curtok = tokens.peek();
+    if (curtok.type() != TokenType::Identifier)
+    {
+        throw SyntaxError("Expected identifier after const keyword");
+        return false;
+    }
+    std::string name = std::get<std::string>(curtok.value());
+    tokens.pop();
+    if (tokens.eof())
+    {
+        throw SyntaxError("Expected typename after const keyword");
+        return false;
+    }
+    curtok = tokens.peek();
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
+    {
+        throw SyntaxError("Expected colon after const keyword");
+        return false;
+    }
+    tokens.pop();
+
+    std::shared_ptr<TypeNode> type;
+
+    if (!parse_type(tokens, false, true, true, type))
+    {
+        throw SyntaxError("Expected typename after const keyword");
+        return false;
+    }
+
+    node = std::make_shared<ConstDeclaration>(type, name);
 
     return true;
 }
@@ -1437,98 +1468,6 @@ static bool jcc::parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
     }
 
     node = std::make_shared<StructDefinition>(std::get<std::string>(next_1.value()), fields, functions, packed);
-
-    return true;
-}
-
-static bool jcc::parse_union_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed)
-{
-    (void)packed;
-    (void)node;
-    if (tokens.size() < 2)
-    {
-        throw SyntaxError("Expected identifier after union keyword");
-        return false;
-    }
-
-    tokens.pop();
-
-    Token curtok = tokens.peek();
-    if (curtok.type() != TokenType::Identifier)
-    {
-        throw SyntaxError("Expected identifier after union keyword");
-        return false;
-    }
-    std::string name = std::get<std::string>(curtok.value());
-
-    tokens.pop();
-    if (tokens.eof())
-    {
-        node = std::make_shared<UnionDeclaration>(name);
-        return true;
-    }
-    curtok = tokens.peek();
-    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::OpenBrace)
-    {
-        node = std::make_shared<UnionDeclaration>(name);
-        return true;
-    }
-    tokens.pop();
-
-    std::vector<std::shared_ptr<UnionField>> fields;
-
-    while (1)
-    {
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected closing brace in union");
-            return false;
-        }
-        std::string name;
-        curtok = tokens.peek();
-        if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Semicolon)
-        {
-            tokens.pop();
-            continue;
-        }
-        else if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::CloseBrace)
-        {
-            tokens.pop();
-            break;
-        }
-        else if (curtok.type() == TokenType::Identifier)
-        {
-            name = std::get<std::string>(curtok.value());
-            tokens.pop();
-        }
-        else
-        {
-            throw SyntaxError("Expected identifier in union field");
-            return false;
-        }
-        if (tokens.eof())
-        {
-            throw SyntaxError("Expected colon in union field");
-            return false;
-        }
-        curtok = tokens.peek();
-        if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
-        {
-            throw SyntaxError("Expected colon in union field");
-            return false;
-        }
-        tokens.pop();
-
-        std::shared_ptr<TypeNode> type;
-        if (!parse_type(tokens, true, true, true, type))
-        {
-            throw SyntaxError("Expected type in union field");
-            return false;
-        }
-        fields.push_back(std::make_shared<UnionField>(name, type));
-    }
-
-    node = std::make_shared<UnionDefinition>(name, fields);
 
     return true;
 }

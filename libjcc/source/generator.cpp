@@ -197,26 +197,6 @@ static std::string generate_struct_declaration_cxx(const std::shared_ptr<jcc::Ge
     return result;
 }
 
-static std::string generate_union_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
-{
-    (void)_subsystem;
-
-    auto uniondef = std::static_pointer_cast<UnionDeclaration>(node);
-    std::string result = mkpadding(indent) + "union " + rectify_name(uniondef->name()) + ";\n";
-
-    return result;
-}
-
-static std::string generate_enum_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
-{
-    (void)_subsystem;
-
-    auto enumdef = std::static_pointer_cast<EnumDeclaration>(node);
-    std::string result = mkpadding(indent) + "enum " + rectify_name(enumdef->name()) + ";\n";
-
-    return result;
-}
-
 static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     (void)_subsystem;
@@ -226,33 +206,75 @@ static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::Gener
     auto letdef = std::static_pointer_cast<LetDeclaration>(node);
     auto type = letdef->dtype();
 
-    if (type->is_const())
+    if (!type->m_is_mutable)
     {
         result += "const ";
     }
-    if (type->arr_size() == std::numeric_limits<uint64_t>::max())
+    if (type->m_arr_size == std::numeric_limits<uint64_t>::max())
     {
-        result += "std::vector<" + rectify_type(type->name()) + ">";
+        result += "std::vector<" + rectify_type(type->m_typename) + ">";
     }
-    else if (type->arr_size() > 0)
+    else if (type->m_arr_size > 0)
     {
-        result += "std::array<" + rectify_type(type->name()) + ", " + std::to_string(type->arr_size()) + "> ";
+        result += "std::array<" + rectify_type(type->m_typename) + ", " + std::to_string(type->m_arr_size) + "> ";
     }
     else
     {
-        result += rectify_type(type->name());
+        result += rectify_type(type->m_typename);
     }
 
-    if (type->is_reference())
+    if (type->m_is_reference)
     {
         result += "&";
     }
 
     result += " " + rectify_name(letdef->name());
 
-    if (type->default_value())
+    if (type->m_default_value)
     {
-        result += " = " + string_escape_string(generate_node_cxx(type->default_value(), indent, _subsystem));
+        result += " = " + string_escape_string(generate_node_cxx(type->m_default_value, indent, _subsystem));
+    }
+
+    result += ";\n";
+
+    return result;
+}
+
+
+static std::string generate_const_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
+{
+    (void)_subsystem;
+
+    std::string result = mkpadding(indent);
+
+    auto letdef = std::static_pointer_cast<ConstDeclaration>(node);
+    auto type = letdef->dtype();
+
+    result += "const ";
+    
+    if (type->m_arr_size == std::numeric_limits<uint64_t>::max())
+    {
+        result += "std::vector<" + rectify_type(type->m_typename) + ">";
+    }
+    else if (type->m_arr_size > 0)
+    {
+        result += "std::array<" + rectify_type(type->m_typename) + ", " + std::to_string(type->m_arr_size) + "> ";
+    }
+    else
+    {
+        result += rectify_type(type->m_typename);
+    }
+
+    if (type->m_is_reference)
+    {
+        result += "&";
+    }
+
+    result += " " + rectify_name(letdef->name());
+
+    if (type->m_default_value)
+    {
+        result += " = " + string_escape_string(generate_node_cxx(type->m_default_value, indent, _subsystem));
     }
 
     result += ";\n";
@@ -269,39 +291,39 @@ static std::string generate_var_declaration_cxx(const std::shared_ptr<jcc::Gener
     auto vardef = std::static_pointer_cast<LetDeclaration>(node);
     auto type = vardef->dtype();
 
-    if (type->is_const())
+    if (!type->m_is_mutable)
     {
         result += "const ";
     }
     result += "std::shared_ptr<";
 
-    if (type->arr_size() == std::numeric_limits<uint64_t>::max())
+    if (type->m_arr_size == std::numeric_limits<uint64_t>::max())
     {
-        result += "std::vector<" + rectify_type(type->name()) + ">";
+        result += "std::vector<" + rectify_type(type->m_typename) + ">";
     }
-    else if (type->arr_size() > 0)
+    else if (type->m_arr_size > 0)
     {
-        result += "std::array<" + rectify_type(type->name()) + ", " + std::to_string(type->arr_size()) + "> ";
+        result += "std::array<" + rectify_type(type->m_typename) + ", " + std::to_string(type->m_arr_size) + "> ";
     }
     else
     {
-        result += rectify_type(type->name());
+        result += rectify_type(type->m_typename);
     }
 
-    if (type->is_reference())
+    if (type->m_is_reference)
     {
         result += "&";
     }
 
     result += "> " + rectify_name(vardef->name());
 
-    if (type->default_value())
+    if (type->m_default_value)
     {
-        result += " = std::make_shared<" + rectify_type(type->name()) + ">(" + string_escape_string(generate_node_cxx(type->default_value(), indent, _subsystem)) + ")";
+        result += " = std::make_shared<" + rectify_type(type->m_typename) + ">(" + string_escape_string(generate_node_cxx(type->m_default_value, indent, _subsystem)) + ")";
     }
     else
     {
-        result += " = std::make_shared<" + rectify_type(type->name()) + ">()";
+        result += " = std::make_shared<" + rectify_type(type->m_typename) + ">()";
     }
 
     result += ";\n";
@@ -407,30 +429,6 @@ static std::string generate_function_declaration_cxx(const std::shared_ptr<jcc::
     result += ");\n";
 
     return result;
-}
-
-static std::string generate_class_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
-{
-    (void)_subsystem;
-
-    auto classdef = std::static_pointer_cast<ClassDeclaration>(node);
-    std::string result = mkpadding(indent) + "class " + rectify_name(classdef->name()) + ";\n";
-
-    return result;
-}
-
-static std::string generate_extern_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
-{
-    (void)_subsystem;
-
-    auto externdef = std::static_pointer_cast<ExternalDeclaration>(node);
-
-    (void)indent;
-
-    /// TODO: Implement this function.
-
-    throw std::runtime_error("Not implemented");
-    return "";
 }
 
 static std::string generate_subsystem_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
@@ -675,45 +673,6 @@ static std::string generate_struct_definition_cxx(const std::shared_ptr<jcc::Gen
     return result;
 }
 
-static std::string generate_union_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
-{
-    (void)_subsystem;
-
-    auto uniondef = std::static_pointer_cast<UnionDefinition>(node);
-    std::string result = mkpadding(indent) + "union " + rectify_name(uniondef->name()) + "\n" + mkpadding(indent) + "{\n";
-
-    indent += INDENT_SIZE;
-
-    for (const auto &field : uniondef->fields())
-    {
-        auto dtype = field->dtype();
-        result += mkpadding(indent) + rectify_type(dtype->name()) + " " + rectify_name(field->name());
-
-        if (dtype->arr_size() > 0)
-        {
-            result += "[" + std::to_string(dtype->arr_size()) + "]";
-        }
-
-        if (dtype->bitfield() > 0)
-        {
-            result += " : " + std::to_string(dtype->bitfield());
-        }
-
-        if (dtype->default_value())
-        {
-            result += " = " + generate_node_cxx(dtype->default_value(), indent, _subsystem);
-        }
-
-        result += ";\n";
-    }
-
-    indent -= INDENT_SIZE;
-
-    result += mkpadding(indent) + "};\n\n";
-
-    return result;
-}
-
 static std::string generate_function_definition_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto funcdef = std::static_pointer_cast<FunctionDefinition>(node);
@@ -839,22 +798,16 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return generate_typedef_cxx(node, indent, _subsystem);
     case NodeType::StructDeclaration:
         return generate_struct_declaration_cxx(node, indent, _subsystem);
-    case NodeType::UnionDeclaration:
-        return generate_union_declaration_cxx(node, indent, _subsystem);
-    case NodeType::EnumDeclaration:
-        return generate_enum_declaration_cxx(node, indent, _subsystem);
 
     case NodeType::LetDeclaration:
         return generate_let_declaration_cxx(node, indent, _subsystem);
     case NodeType::VarDeclaration:
         return generate_var_declaration_cxx(node, indent, _subsystem);
+    case NodeType::ConstDeclaration:
+        return generate_const_declaration_cxx(node, indent, _subsystem);
 
     case NodeType::FunctionDeclaration:
         return generate_function_declaration_cxx(node, indent, _subsystem);
-    case NodeType::ClassDeclaration:
-        return generate_class_declaration_cxx(node, indent, _subsystem);
-    case NodeType::ExternalDeclaration:
-        return generate_extern_declaration_cxx(node, indent, _subsystem);
     case NodeType::SubsystemDeclaration:
         return generate_subsystem_declaration_cxx(node, indent, _subsystem);
 
@@ -864,8 +817,6 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
         return generate_struct_definition_cxx(node, indent, _subsystem);
     case NodeType::StructMethod:
         return generate_struct_method_cxx(node, indent, _subsystem);
-    case NodeType::UnionDefinition:
-        return generate_union_definition_cxx(node, indent, _subsystem);
     case NodeType::FunctionDefinition:
         return generate_function_definition_cxx(node, indent, _subsystem);
 
@@ -886,10 +837,6 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
 
     case NodeType::BinaryExpression:
         return generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->left(), indent, _subsystem) + " " + std::static_pointer_cast<BinaryExpression>(node)->op() + " " + generate_node_cxx(std::static_pointer_cast<BinaryExpression>(node)->right(), indent, _subsystem);
-    case NodeType::UnaryExpression:
-        return std::static_pointer_cast<UnaryExpression>(node)->op() + generate_node_cxx(std::static_pointer_cast<UnaryExpression>(node)->expression(), indent, _subsystem);
-    case NodeType::CastExpression:
-        return "(" + std::static_pointer_cast<CastExpression>(node)->type() + ")" + generate_node_cxx(std::static_pointer_cast<CastExpression>(node)->expression(), indent, _subsystem);
     case NodeType::LiteralExpression:
         return std::static_pointer_cast<LiteralExpression>(node)->value();
     case NodeType::CallExpression:

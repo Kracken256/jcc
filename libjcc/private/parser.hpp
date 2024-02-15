@@ -36,13 +36,12 @@ namespace jcc
 
         TypeDeclaration,
         StructDeclaration,
-        UnionDeclaration,
-        EnumDeclaration,
         FunctionParameter,
         FunctionDeclaration,
-        ClassDeclaration,
-        ExternalDeclaration,
         SubsystemDeclaration,
+        LetDeclaration,
+        VarDeclaration,
+        ConstDeclaration,
 
         ///===================
         /// Definitions
@@ -53,19 +52,17 @@ namespace jcc
         StructMethod,
         StructAttribute,
         StructDefinition,
-        UnionField,
-        UnionDefinition,
         FunctionDefinition,
 
         ///===================
         /// Expressions
         ///===================
-        BinaryExpression,
-        UnaryExpression,
-        CastExpression,
         NullExpression,
-        LiteralExpression,
+        BinaryExpression,
+
         CallExpression,
+
+        LiteralExpression,
         StringLiteralExpression,
         CharLiteralExpression,
         IntegerLiteralExpression,
@@ -76,8 +73,7 @@ namespace jcc
         /// Statements
         ///===================
         ReturnStatement,
-        LetDeclaration,
-        VarDeclaration,
+        ExportStatement,
     };
 
     enum class VisiblityModifier
@@ -109,35 +105,17 @@ namespace jcc
     {
     public:
         TypeNode(NodeType type = NodeType::TypeNode) : GenericNode(type) {}
-        TypeNode(const std::string &name, bool is_const, bool is_reference, size_t arr_size, size_t bitfield, std::shared_ptr<Expression> default_value) : GenericNode(NodeType::TypeNode), m_name(name), m_is_const(is_const), m_is_reference(is_reference), m_arr_size(arr_size), m_bitfield(bitfield), m_default_value(default_value) {}
+        TypeNode(const std::string &name, bool is_mutable, bool is_reference, size_t arr_size, size_t bitfield, std::shared_ptr<Expression> default_value) : GenericNode(NodeType::TypeNode), m_typename(name), m_is_mutable(is_mutable), m_is_reference(is_reference), m_arr_size(arr_size), m_bitfield(bitfield), m_default_value(default_value) {}
         virtual ~TypeNode() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        const bool &is_const() const { return m_is_const; }
-        bool &is_const() { return m_is_const; }
-
-        const bool &is_reference() const { return m_is_reference; }
-        bool &is_reference() { return m_is_reference; }
-
-        const size_t &arr_size() const { return m_arr_size; }
-        size_t &arr_size() { return m_arr_size; }
-
-        const size_t &bitfield() const { return m_bitfield; }
-        size_t &bitfield() { return m_bitfield; }
-
-        const std::shared_ptr<Expression> &default_value() const { return m_default_value; }
-        std::shared_ptr<Expression> &default_value() { return m_default_value; }
 
         std::string to_json() const override;
 
-    protected:
-        std::string m_name;
-        bool m_is_const;
-        bool m_is_reference;
-        size_t m_arr_size;
-        size_t m_bitfield;
+        std::string m_typename;
+
+        bool m_is_mutable = true;
+        bool m_is_reference = false;
+        size_t m_arr_size = 0;
+        size_t m_bitfield = 0;
         std::shared_ptr<Expression> m_default_value;
     };
 
@@ -264,38 +242,6 @@ namespace jcc
         std::string m_name;
     };
 
-    class UnionDeclaration : public TypeDeclaration
-    {
-    public:
-        UnionDeclaration(NodeType type = NodeType::UnionDeclaration) : TypeDeclaration(type) {}
-        UnionDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::UnionDeclaration), m_name(name) {}
-        virtual ~UnionDeclaration() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::string m_name;
-    };
-
-    class EnumDeclaration : public TypeDeclaration
-    {
-    public:
-        EnumDeclaration(NodeType type = NodeType::EnumDeclaration) : TypeDeclaration(type) {}
-        EnumDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::EnumDeclaration), m_name(name) {}
-        virtual ~EnumDeclaration() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::string m_name;
-    };
-
     class FunctionParameter : public GenericNode
     {
     public:
@@ -360,38 +306,6 @@ namespace jcc
         uint64_t m_return_arr_size;
     };
 
-    class ClassDeclaration : public TypeDeclaration
-    {
-    public:
-        ClassDeclaration(NodeType type = NodeType::ClassDeclaration) : TypeDeclaration(type) {}
-        ClassDeclaration(const std::string &name) : TypeDeclaration(name, "", NodeType::ClassDeclaration), m_name(name) {}
-        virtual ~ClassDeclaration() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::string m_name;
-    };
-
-    class ExternalDeclaration : public Declaration
-    {
-    public:
-        ExternalDeclaration(NodeType type = NodeType::ExternalDeclaration) : Declaration(type) {}
-        ExternalDeclaration(std::shared_ptr<Declaration> declaration) : Declaration(NodeType::ExternalDeclaration), m_declaration(declaration) {}
-        virtual ~ExternalDeclaration() {}
-
-        const std::shared_ptr<Declaration> &declaration() const { return m_declaration; }
-        std::shared_ptr<Declaration> &declaration() { return m_declaration; }
-
-        std::string to_json() const override { return "{\"type\":\"external_declaration\",\"declaration\":" + m_declaration->to_json() + "}"; }
-
-    protected:
-        std::shared_ptr<Declaration> m_declaration;
-    };
-
     class SubsystemDeclaration : public Declaration
     {
     public:
@@ -410,6 +324,63 @@ namespace jcc
     protected:
         std::string m_name;
         std::vector<std::string> m_dependencies;
+    };
+
+    class LetDeclaration : public Definition
+    {
+    public:
+        LetDeclaration(NodeType type = NodeType::LetDeclaration) : Definition(type) {}
+        LetDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::LetDeclaration), m_type(type), m_name(name) {}
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
+        std::shared_ptr<TypeNode> &dtype() { return m_type; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        std::string to_json() const override;
+
+    protected:
+        std::shared_ptr<TypeNode> m_type;
+        std::string m_name;
+    };
+
+    class VarDeclaration : public Definition
+    {
+    public:
+        VarDeclaration(NodeType type = NodeType::VarDeclaration) : Definition(type) {}
+        VarDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::VarDeclaration), m_type(type), m_name(name) {}
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
+        std::shared_ptr<TypeNode> &dtype() { return m_type; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        std::string to_json() const override;
+
+    protected:
+        std::shared_ptr<TypeNode> m_type;
+        std::string m_name;
+    };
+
+    class ConstDeclaration : public Definition
+    {
+    public:
+        ConstDeclaration(NodeType type = NodeType::ConstDeclaration) : Definition(type) {}
+        ConstDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::ConstDeclaration), m_type(type), m_name(name) {}
+
+        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
+        std::shared_ptr<TypeNode> &dtype() { return m_type; }
+
+        const std::string &name() const { return m_name; }
+        std::string &name() { return m_name; }
+
+        std::string to_json() const override;
+
+    protected:
+        std::shared_ptr<TypeNode> m_type;
+        std::string m_name;
     };
 
     ///=================================================================================================
@@ -496,26 +467,6 @@ namespace jcc
         std::vector<std::shared_ptr<StructAttribute>> m_attributes;
     };
 
-    class UnionField : public GenericNode
-    {
-    public:
-        UnionField(NodeType type = NodeType::UnionField) : GenericNode(type) {}
-        UnionField(const std::string &name, const std::shared_ptr<TypeNode> &type) : GenericNode(NodeType::UnionField), m_name(name), m_dtype(type) {}
-        virtual ~UnionField() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        const std::shared_ptr<TypeNode> &dtype() const { return m_dtype; }
-        std::shared_ptr<TypeNode> &dtype() { return m_dtype; }
-
-        std::string to_json() const override { return "{\"type\":\"union_field\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_dtype->to_json() + "}"; }
-
-    protected:
-        std::string m_name;
-        std::shared_ptr<TypeNode> m_dtype;
-    };
-
     class StructMethod : public GenericNode
     {
     public:
@@ -569,30 +520,6 @@ namespace jcc
         std::string m_name;
         std::vector<std::shared_ptr<StructField>> m_fields;
         std::vector<std::shared_ptr<StructMethod>> m_methods;
-        bool m_packed;
-    };
-
-    class UnionDefinition : public Definition
-    {
-    public:
-        UnionDefinition(NodeType type = NodeType::UnionDefinition) : Definition(type), m_packed(false) {}
-        UnionDefinition(const std::string &name, std::vector<std::shared_ptr<UnionField>> fields, bool packed = false) : Definition(NodeType::UnionDefinition), m_name(name), m_fields(fields), m_packed(packed) {}
-        virtual ~UnionDefinition() {}
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        const std::vector<std::shared_ptr<UnionField>> &fields() const { return m_fields; }
-        std::vector<std::shared_ptr<UnionField>> &fields() { return m_fields; }
-
-        const bool &packed() const { return m_packed; }
-        bool &packed() { return m_packed; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::string m_name;
-        std::vector<std::shared_ptr<UnionField>> m_fields;
         bool m_packed;
     };
 
@@ -654,46 +581,6 @@ namespace jcc
         std::string m_op;
         std::shared_ptr<Expression> m_left;
         std::shared_ptr<Expression> m_right;
-    };
-
-    class UnaryExpression : public Expression
-    {
-    public:
-        UnaryExpression(NodeType type = NodeType::UnaryExpression) : Expression(type) {}
-        UnaryExpression(const std::string &op, std::shared_ptr<Expression> expression) : Expression(NodeType::UnaryExpression), m_op(op), m_expression(expression) {}
-        virtual ~UnaryExpression() {}
-
-        const std::string &op() const { return m_op; }
-        std::string &op() { return m_op; }
-
-        const std::shared_ptr<Expression> &expression() const { return m_expression; }
-        std::shared_ptr<Expression> &expression() { return m_expression; }
-
-        std::string to_json() const override { return "{\"type\":\"unary_expression\",\"op\":\"" + json_escape(m_op) + "\",\"expression\":" + m_expression->to_json() + "}"; }
-
-    protected:
-        std::string m_op;
-        std::shared_ptr<Expression> m_expression;
-    };
-
-    class CastExpression : public Expression
-    {
-    public:
-        CastExpression(NodeType type = NodeType::CastExpression) : Expression(type) {}
-        CastExpression(const std::string &type, std::shared_ptr<Expression> expression) : Expression(NodeType::CastExpression), m_type(type), m_expression(expression) {}
-        virtual ~CastExpression() {}
-
-        const std::string &type() const { return m_type; }
-        std::string &type() { return m_type; }
-
-        const std::shared_ptr<Expression> &expression() const { return m_expression; }
-        std::shared_ptr<Expression> &expression() { return m_expression; }
-
-        std::string to_json() const override { return "{\"type\":\"cast_expression\",\"type\":\"" + json_escape(m_type) + "\",\"expression\":" + m_expression->to_json() + "}"; }
-
-    protected:
-        std::string m_type;
-        std::shared_ptr<Expression> m_expression;
     };
 
     class NullExpression : public Expression
@@ -818,43 +705,6 @@ namespace jcc
         std::shared_ptr<Expression> m_expression;
     };
 
-    class LetDeclaration : public Statement
-    {
-    public:
-        LetDeclaration(NodeType type = NodeType::LetDeclaration) : Statement(type) {}
-        LetDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Statement(NodeType::LetDeclaration), m_type(type), m_name(name) {}
-
-        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
-        std::shared_ptr<TypeNode> &dtype() { return m_type; }
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::shared_ptr<TypeNode> m_type;
-        std::string m_name;
-    };
-
-    class VarDeclaration : public Statement
-    {
-    public:
-        VarDeclaration(NodeType type = NodeType::VarDeclaration) : Statement(type) {}
-        VarDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Statement(NodeType::VarDeclaration), m_type(type), m_name(name) {}
-
-        const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
-        std::shared_ptr<TypeNode> &dtype() { return m_type; }
-
-        const std::string &name() const { return m_name; }
-        std::string &name() { return m_name; }
-
-        std::string to_json() const override;
-
-    protected:
-        std::shared_ptr<TypeNode> m_type;
-        std::string m_name;
-    };
 }
 
 namespace std
