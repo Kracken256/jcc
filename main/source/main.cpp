@@ -75,6 +75,25 @@ static void print_error(const std::string &message)
     std::cerr << "\x1b[37;49;1mjcc:\x1b[0m \x1b[31;49;1mError:\x1b[0m " << message << std::endl;
 }
 
+static void print_help()
+{
+    std::cout << "Usage: jcc [options] file.j [file.j ...]\n"
+                 "Options:\n"
+                 "  -o <file>  Place the output into <file>\n"
+                 "  -v         Verbose output\n"
+                 "  -g         Generate debug information\n"
+                 "  -O0        Do not optimize\n"
+                 "  -O1        Do basic optimizations\n"
+                 "  -O2        Optimize (default)\n"
+                 "  -O3        Optimize aggressively\n"
+                 "  -Os        Optimize for size\n"
+                 "  -c         Compile only, do not link\n"
+                 "  -S         Translate only, do not compile or link\n\n";
+
+    std::cout << "Copyright (C) 2024 Wesley C. Jones. All rights "
+                 "reserved.\n";
+}
+
 bool parse_arguments(StringVector args, JccMode &mode)
 {
     if (args.size() < 1)
@@ -88,7 +107,12 @@ bool parse_arguments(StringVector args, JccMode &mode)
 
     for (auto it = args.begin(); it != args.end(); ++it)
     {
-        if (*it == "-o" && mode.output_file != "")
+        if (*it == "-h" || *it == "--help")
+        {
+            print_help();
+            exit(0);
+        }
+        else if (*it == "-o" && mode.output_file != "")
         {
             print_error("multiple output files specified");
             return false;

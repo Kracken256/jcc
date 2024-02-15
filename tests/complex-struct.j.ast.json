@@ -1,1 +1,0 @@
-{"type":"block","children":[{"type":"struct_definition","name":"VectorF","fields":[{"type":"struct_field","name":"D","dtype":"int","default_value":"","bitfield":0,"arr_size":"dynamic","attributes":[]}]}]}

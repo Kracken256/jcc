@@ -1,3 +1,0 @@
-
-export globalX: dword
-
