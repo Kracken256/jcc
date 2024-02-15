@@ -66,46 +66,6 @@ namespace jcc
 
         std::string to_string() const
         {
-            // std::string str = "Node(";
-            // switch (value.type())
-            // {
-            // case jcc::TokenType::Identifier:
-            //     str += std::get<std::string>(value.value());
-            //     break;
-            // case jcc::TokenType::Operator:
-            //     str += jcc::lexOperatorMapReverse.at(std::get<jcc::Operator>(value.value()));
-            //     break;
-            // case jcc::TokenType::NumberLiteral:
-            //     str += std::to_string(std::get<uint64_t>(value.value()));
-            //     break;
-            // case jcc::TokenType::StringLiteral:
-            //     str += std::get<std::string>(value.value());
-            //     break;
-            // case jcc::TokenType::Keyword:
-            //     str += std::get<std::string>(value.value());
-            //     break;
-            // case jcc::TokenType::Punctuator:
-            //     str += jcc::lexPunctuatorMapReverse.at(std::get<jcc::Punctuator>(value.value()));
-            //     break;
-            // default:
-            //     break;
-            // }
-            // str += ", [";
-            // for (const auto &child : children)
-            // {
-            //     str += child.to_string() + ", ";
-            // }
-
-            // if (children.size() > 0)
-            // {
-            //     str.pop_back();
-            //     str.pop_back();
-            // }
-
-            // str += "])";
-
-            // return str;
-
             return print_tree(*this, "", true, "");
         }
     };
@@ -175,28 +135,6 @@ std::string jcc::GenericNode::json_escape(const std::string &str) const
     return escaped;
 }
 
-///=============================================================================
-/// Block
-///=============================================================================
-
-std::string jcc::Block::to_string() const
-{
-    std::string str = "Block([";
-    for (auto &child : m_children)
-    {
-        str += child->to_string() + ", ";
-    }
-
-    if (m_children.size() > 0)
-    {
-        str.pop_back();
-        str.pop_back();
-    }
-
-    str += "])";
-    return str;
-}
-
 std::string jcc::Block::to_json() const
 {
     std::string str = "{\"type\":\"block\",\"children\":[";
@@ -212,29 +150,9 @@ std::string jcc::Block::to_json() const
     return str;
 }
 
-///=============================================================================
-/// StructDeclaration
-///=============================================================================
-
-std::string jcc::StructDeclaration::to_string() const
-{
-    std::string str = "StructDeclaration(" + m_name + ")";
-    return str;
-}
-
 std::string jcc::StructDeclaration::to_json() const
 {
     std::string str = "{\"type\":\"struct_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
-    return str;
-}
-
-///=============================================================================
-/// UnionDeclaration
-///=============================================================================
-
-std::string jcc::UnionDeclaration::to_string() const
-{
-    std::string str = "UnionDeclaration(" + m_name + ")";
     return str;
 }
 
@@ -244,57 +162,15 @@ std::string jcc::UnionDeclaration::to_json() const
     return str;
 }
 
-///=============================================================================
-/// EnumDeclaration
-///=============================================================================
-
-std::string jcc::EnumDeclaration::to_string() const
-{
-    std::string str = "EnumDeclaration(" + m_name + ")";
-    return str;
-}
-
 std::string jcc::EnumDeclaration::to_json() const
 {
     std::string str = "{\"type\":\"enum_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
     return str;
 }
 
-///=============================================================================
-/// FunctionParameter
-///=============================================================================
-
-std::string jcc::FunctionParameter::to_string() const
-{
-    std::string str = "FunctionParameter(" + m_name + ", " + m_type + ")";
-    return str;
-}
-
 std::string jcc::FunctionParameter::to_json() const
 {
     std::string str = "{\"type\":\"function_parameter\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":\"" + json_escape(m_type) + "\"}";
-    return str;
-}
-
-///=============================================================================
-/// FunctionDeclaration
-///=============================================================================
-
-std::string jcc::FunctionDeclaration::to_string() const
-{
-    std::string str = "FunctionDeclaration(" + m_name + ", " + m_return_type + ", [";
-    for (auto &parameter : m_parameters)
-    {
-        str += parameter->to_string() + ", ";
-    }
-
-    if (m_parameters.size() > 0)
-    {
-        str.pop_back();
-        str.pop_back();
-    }
-
-    str += "])";
     return str;
 }
 
@@ -313,16 +189,6 @@ std::string jcc::FunctionDeclaration::to_json() const
     return str;
 }
 
-///=============================================================================
-/// ClassDeclaration
-///=============================================================================
-
-std::string jcc::ClassDeclaration::to_string() const
-{
-    std::string str = "ClassDeclaration(" + m_name + ")";
-    return str;
-}
-
 std::string jcc::ClassDeclaration::to_json() const
 {
     std::string str = "{\"type\":\"class_declaration\",\"name\":\"" + json_escape(m_name) + "\"}";
@@ -337,25 +203,11 @@ std::string std::to_string(const std::shared_ptr<jcc::GenericNode> value)
     return value->to_json();
 }
 
-///=============================================================================
-/// SubsystemDefinition
-///=============================================================================
-
-std::string jcc::SubsystemDefinition::to_string() const
-{
-    std::string str = "SubsystemDefinition(" + m_name + ", {" + m_block->to_string() + "})";
-    return str;
-}
-
 std::string jcc::SubsystemDefinition::to_json() const
 {
     std::string str = "{\"type\":\"subsystem_definition\",\"name\":\"" + json_escape(m_name) + "\",\"block\":" + m_block->to_json() + "}";
     return str;
 }
-
-///=============================================================================
-/// StructField
-///=============================================================================
 
 std::string jcc::StructField::to_json() const
 {
@@ -384,10 +236,6 @@ std::string jcc::StructField::to_json() const
     return str;
 }
 
-///=============================================================================
-/// StructMethod
-///=============================================================================
-
 std::string jcc::StructMethod::to_json() const
 {
     std::string str = "{\"type\":\"struct_member\",\"name\":\"" + json_escape(m_name) + "\",\"return_type\":\"" + json_escape(m_type) + "\",\"parameters\":[";
@@ -403,33 +251,14 @@ std::string jcc::StructMethod::to_json() const
     return str;
 }
 
-///=============================================================================
-/// StructDefinition
-///=============================================================================
-
-std::string jcc::StructDefinition::to_string() const
-{
-    std::string str = "StructDefinition(" + m_name + ", [";
-    for (const auto &child : m_fields)
-    {
-        str += child->to_string() + ", ";
-    }
-
-    if (m_fields.size() > 0)
-    {
-        str.pop_back();
-        str.pop_back();
-    }
-
-    str += "])";
-
-    return str;
-}
-
 std::string jcc::StructDefinition::to_json() const
 {
     std::string str = "{\"type\":\"struct_definition\",\"name\":\"" + json_escape(m_name) + "\",\"fields\":[";
     for (const auto &child : m_fields)
+    {
+        str += child->to_json() + ",";
+    }
+    for (const auto &child : m_methods)
     {
         str += child->to_json() + ",";
     }
@@ -440,10 +269,6 @@ std::string jcc::StructDefinition::to_json() const
     str += "]}";
     return str;
 }
-
-///=============================================================================
-/// UnionDefinition
-///=============================================================================
 
 std::string jcc::UnionDefinition::to_json() const
 {
@@ -460,28 +285,6 @@ std::string jcc::UnionDefinition::to_json() const
     return str;
 }
 
-///=============================================================================
-/// FunctionDefinition
-///=============================================================================
-
-std::string jcc::FunctionDefinition::to_string() const
-{
-    std::string str = "FunctionDefinition(" + m_name + ", " + m_return_type + ", [";
-    for (auto &parameter : m_parameters)
-    {
-        str += parameter->to_string() + ", ";
-    }
-
-    if (m_parameters.size() > 0)
-    {
-        str.pop_back();
-        str.pop_back();
-    }
-
-    str += "], {" + m_block->to_string() + "})";
-    return str;
-}
-
 std::string jcc::FunctionDefinition::to_json() const
 {
     std::string str = "{\"type\":\"function_definition\",\"name\":\"" + json_escape(m_name) + "\",\"return_type\":\"" + json_escape(m_return_type) + "\",\"parameters\":[";
@@ -494,28 +297,6 @@ std::string jcc::FunctionDefinition::to_json() const
         str.pop_back();
     }
     str += "],\"block\":" + m_block->to_json() + "}";
-    return str;
-}
-
-///=============================================================================
-/// CallExpression
-///=============================================================================
-
-std::string jcc::CallExpression::to_string() const
-{
-    std::string str = "CallExpression(" + m_name + ", [";
-    for (auto &child : m_arguments)
-    {
-        str += child->to_string() + ", ";
-    }
-
-    if (m_arguments.size() > 0)
-    {
-        str.pop_back();
-        str.pop_back();
-    }
-
-    str += "])";
     return str;
 }
 
@@ -555,10 +336,6 @@ std::string jcc::TypeNode::to_json() const
     return str;
 }
 
-///=============================================================================
-/// LetDeclaration
-///=============================================================================
-
 std::string jcc::LetDeclaration::to_json() const
 {
     std::string str = "{\"type\":\"let_declaration\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_type->to_json() + "}";
@@ -566,20 +343,12 @@ std::string jcc::LetDeclaration::to_json() const
     return str;
 }
 
-///=============================================================================
-/// VarDeclaration
-///=============================================================================
-
 std::string jcc::VarDeclaration::to_json() const
 {
     std::string str = "{\"type\":\"var_declaration\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_type->to_json() + "}";
 
     return str;
 }
-
-///=============================================================================
-/// Parser
-///=============================================================================
 
 namespace jcc
 {
@@ -589,7 +358,6 @@ namespace jcc
     static bool parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_enum_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_typedef_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-    static bool parse_namespace_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_subsystem_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_function_parameters(jcc::TokenList &tokens, std::vector<std::shared_ptr<jcc::FunctionParameter>> &params);
     static bool parse_func_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, jcc::FunctionParseMode mode);
@@ -603,7 +371,6 @@ namespace jcc
     static bool parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-    static bool parse_extern_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr_size, bool allow_default_value, std::shared_ptr<jcc::TypeNode> &node);
 }
@@ -835,12 +602,6 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                     return false;
                 block->push(tmp);
                 break;
-            case Keyword::Extern:
-                if (!parse_extern_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-
             case Keyword::Let:
                 if (!parse_let_keyword(tokens, tmp))
                     return false;
@@ -1209,14 +970,6 @@ static bool jcc::parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jc
 }
 
 static bool jcc::parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
-{
-    (void)tokens;
-    (void)node;
-    /// TODO: implement
-    return false;
-}
-
-static bool jcc::parse_extern_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
     (void)tokens;
     (void)node;

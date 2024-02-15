@@ -816,6 +816,14 @@ bool jcc::CompilationUnit::compile_file(const std::string &file)
         return false;
     }
 
+    std::ofstream astOut(file + ".ast.json");
+    if (astOut.is_open())
+    {
+        astOut << ast->to_json();
+        astOut.close();
+    }
+    
+
     /// TODO: Implement semantic analyzer
 
     /// TODO: Implement AST optimizer

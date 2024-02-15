@@ -260,6 +260,55 @@ static std::string generate_let_declaration_cxx(const std::shared_ptr<jcc::Gener
     return result;
 }
 
+static std::string generate_var_declaration_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
+{
+    (void)_subsystem;
+
+    std::string result = mkpadding(indent);
+
+    auto vardef = std::static_pointer_cast<LetDeclaration>(node);
+    auto type = vardef->dtype();
+
+    if (type->is_const())
+    {
+        result += "const ";
+    }
+    result += "std::shared_ptr<";
+
+    if (type->arr_size() == std::numeric_limits<uint64_t>::max())
+    {
+        result += "std::vector<" + rectify_type(type->name()) + ">";
+    }
+    else if (type->arr_size() > 0)
+    {
+        result += "std::array<" + rectify_type(type->name()) + ", " + std::to_string(type->arr_size()) + "> ";
+    }
+    else
+    {
+        result += rectify_type(type->name());
+    }
+
+    if (type->is_reference())
+    {
+        result += "&";
+    }
+
+    result += "> " + rectify_name(vardef->name());
+
+    if (type->default_value())
+    {
+        result += " = std::make_shared<" + rectify_type(type->name()) + ">(" + string_escape_string(generate_node_cxx(type->default_value(), indent, _subsystem)) + ")";
+    }
+    else
+    {
+        result += " = std::make_shared<" + rectify_type(type->name()) + ">()";
+    }
+
+    result += ";\n";
+
+    return result;
+}
+
 static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::GenericNode> &node, uint32_t &indent, std::string &_subsystem)
 {
     auto param = std::static_pointer_cast<FunctionParameter>(node);
@@ -289,13 +338,13 @@ static std::string generate_function_parameter_cxx(const std::shared_ptr<jcc::Ge
     }
     else
     {
-        if (param->is_const())
+        if (param->is_const() && !param->is_reference())
         {
             result += "const ";
         }
 
         result += rectify_type(param->type());
-        if (param->is_reference())
+        if (param->is_reference() || param->is_const())
         {
             result += "&";
         }
@@ -797,6 +846,8 @@ static std::string generate_node_cxx(const std::shared_ptr<jcc::GenericNode> &no
 
     case NodeType::LetDeclaration:
         return generate_let_declaration_cxx(node, indent, _subsystem);
+    case NodeType::VarDeclaration:
+        return generate_var_declaration_cxx(node, indent, _subsystem);
 
     case NodeType::FunctionDeclaration:
         return generate_function_declaration_cxx(node, indent, _subsystem);
@@ -894,9 +945,9 @@ const std::string typedef_commons = R"(#include <cstdint>
 #include <vector>
 #include <string>
 #include <map>
+#include <memory>
 #include <cstring>
 #include <iostream>
-#include <cstdlib>
 
 typedef bool _bool;
 typedef int8_t _char;

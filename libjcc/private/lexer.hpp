@@ -34,9 +34,7 @@ namespace jcc
         // Symbols import/export
         Import,
         Export,
-        Extern,
 
-        Infer,
         Let,
         Var,
 
@@ -58,6 +56,7 @@ namespace jcc
 
         // Object-oriented
         Class,
+        Bundle,
         Public,
         Private,
         Protected,
@@ -80,12 +79,10 @@ namespace jcc
         Return,
         Retif,
         Retz,
-        Retnz,
         Abortif,
         Case,
         Break,
         Default,
-        Abort,
         Throw,
         Continue,
 
@@ -127,9 +124,7 @@ namespace jcc
 
         {"import", jcc::Keyword::Import},
         {"export", jcc::Keyword::Export},
-        {"extern", jcc::Keyword::Extern},
 
-        {"infer", jcc::Keyword::Infer},
         {"let", jcc::Keyword::Let},
         {"var", jcc::Keyword::Var},
 
@@ -166,10 +161,12 @@ namespace jcc
         {"do", jcc::Keyword::Do},
         {"switch", jcc::Keyword::Switch},
         {"return", jcc::Keyword::Return},
+        {"retif", jcc::Keyword::Retif},
+        {"retz", jcc::Keyword::Retz},
+        {"abortif", jcc::Keyword::Abortif},
         {"case", jcc::Keyword::Case},
         {"break", jcc::Keyword::Break},
         {"default", jcc::Keyword::Default},
-        {"abort", jcc::Keyword::Abort},
         {"throw", jcc::Keyword::Throw},
         {"continue", jcc::Keyword::Continue},
 
@@ -208,9 +205,7 @@ namespace jcc
 
         {jcc::Keyword::Import, "import"},
         {jcc::Keyword::Export, "export"},
-        {jcc::Keyword::Extern, "extern"},
 
-        {jcc::Keyword::Infer, "infer"},
         {jcc::Keyword::Let, "let"},
         {jcc::Keyword::Var, "var"},
 
@@ -247,10 +242,12 @@ namespace jcc
         {jcc::Keyword::Do, "do"},
         {jcc::Keyword::Switch, "switch"},
         {jcc::Keyword::Return, "return"},
+        {jcc::Keyword::Retif, "retif"},
+        {jcc::Keyword::Retz, "retz"},
+        {jcc::Keyword::Abortif, "abortif"},
         {jcc::Keyword::Case, "case"},
         {jcc::Keyword::Break, "break"},
         {jcc::Keyword::Default, "default"},
-        {jcc::Keyword::Abort, "abort"},
         {jcc::Keyword::Throw, "throw"},
         {jcc::Keyword::Continue, "continue"},
 

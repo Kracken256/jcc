@@ -141,10 +141,10 @@ func Main(args: string[]): int {
     ;      return value
     ;  }
     retnz 1, step_1(), print("step 1 failed")
-    retrn 2, step_2(), print("step 2 failed")
-    retrn 3, step_3(), print("step 3 failed")
-    retrn 4, step_4(), print("step 4 failed")
-    retrn 5, step_5(), print("step 5 failed")
+    retnz 2, step_2(), print("step 2 failed")
+    retnz 3, step_3(), print("step 3 failed")
+    retnz 4, step_4(), print("step 4 failed")
+    retnz 5, step_5(), print("step 5 failed")
 
     return 0
 }

@@ -95,7 +95,6 @@ namespace jcc
 
         NodeType type() const { return m_type; }
 
-        virtual std::string to_string() const { return "GenericNode()"; }
         virtual std::string to_json() const { return "{\"type\":\"generic_node\"}"; }
 
     protected:
@@ -131,7 +130,6 @@ namespace jcc
         const std::shared_ptr<Expression> &default_value() const { return m_default_value; }
         std::shared_ptr<Expression> &default_value() { return m_default_value; }
 
-        std::string to_string() const override { return "TypeNode(" + m_name + ")"; }
         std::string to_json() const override;
 
     protected:
@@ -153,7 +151,6 @@ namespace jcc
         const std::string &value() const { return m_value; }
         std::string &value() { return m_value; }
 
-        std::string to_string() const override { return "RawNode(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"raw_node\",\"value\":\"" + json_escape(m_value) + "\"}"; }
 
     protected:
@@ -166,7 +163,6 @@ namespace jcc
         Expression(NodeType type = NodeType::Expression) : GenericNode(type) {}
         virtual ~Expression() {}
 
-        std::string to_string() const override { return "Expression()"; }
         std::string to_json() const override { return "{\"type\":\"expression\"}"; }
     };
 
@@ -176,7 +172,6 @@ namespace jcc
         Statement(NodeType type = NodeType::Statement) : GenericNode(type) {}
         virtual ~Statement() {}
 
-        std::string to_string() const override { return "Statement()"; }
         std::string to_json() const override { return "{\"type\":\"statement\"}"; }
     };
 
@@ -186,7 +181,6 @@ namespace jcc
         Declaration(NodeType type = NodeType::Declaration) : GenericNode(type) {}
         virtual ~Declaration() {}
 
-        std::string to_string() const override { return "Declaration()"; }
         std::string to_json() const override { return "{\"type\":\"declaration\"}"; }
     };
 
@@ -196,7 +190,6 @@ namespace jcc
         Definition(NodeType type = NodeType::Definition) : GenericNode(type) {}
         virtual ~Definition() {}
 
-        std::string to_string() const override { return "Definition()"; }
         std::string to_json() const override { return "{\"type\":\"definition\"}"; }
     };
 
@@ -214,7 +207,6 @@ namespace jcc
 
         void push(std::shared_ptr<GenericNode> node) { m_children.push_back(node); }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -249,7 +241,6 @@ namespace jcc
         /// @return Name of the type
         std::string &type_name() { return m_typename; }
 
-        std::string to_string() const override { return "TypeDeclaration(" + m_alias + ", " + m_typename + ")"; }
         std::string to_json() const override { return "{\"type\":\"type_declaration\",\"alias\":\"" + json_escape(m_alias) + "\",\"typename\":\"" + json_escape(m_typename) + "\"}"; }
 
     protected:
@@ -267,7 +258,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -284,8 +274,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override;
-
         std::string to_json() const override;
 
     protected:
@@ -301,8 +289,6 @@ namespace jcc
 
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
-
-        std::string to_string() const override;
 
         std::string to_json() const override;
 
@@ -329,7 +315,6 @@ namespace jcc
         const uint64_t &arr_size() const { return m_arr_size; }
         uint64_t &arr_size() { return m_arr_size; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
         const bool &is_const() const { return m_is_const; }
@@ -366,7 +351,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -386,7 +370,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -402,8 +385,6 @@ namespace jcc
 
         const std::shared_ptr<Declaration> &declaration() const { return m_declaration; }
         std::shared_ptr<Declaration> &declaration() { return m_declaration; }
-
-        std::string to_string() const override { return "ExternalDeclaration(" + m_declaration->to_string() + ")"; }
 
         std::string to_json() const override { return "{\"type\":\"external_declaration\",\"declaration\":" + m_declaration->to_json() + "}"; }
 
@@ -424,7 +405,6 @@ namespace jcc
         const std::vector<std::string> &dependencies() const { return m_dependencies; }
         std::vector<std::string> &dependencies() { return m_dependencies; }
 
-        std::string to_string() const override { return "SubsystemDeclaration(" + m_name + ")"; }
         std::string to_json() const override { return "{\"type\":\"subsystem_declaration\",\"name\":\"" + json_escape(m_name) + "\"}"; }
 
     protected:
@@ -452,7 +432,6 @@ namespace jcc
         const std::shared_ptr<Block> &block() const { return m_block; }
         std::shared_ptr<Block> &block() { return m_block; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -474,7 +453,6 @@ namespace jcc
         const std::string &value() const { return m_value; }
         std::string &value() { return m_value; }
 
-        std::string to_string() const override { return "StructAttribute(" + m_name + ", " + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"struct_attribute\",\"name\":\"" + json_escape(m_name) + "\",\"value\":\"" + json_escape(m_value) + "\"}"; }
 
     protected:
@@ -507,7 +485,6 @@ namespace jcc
         const std::vector<std::shared_ptr<StructAttribute>> &attributes() const { return m_attributes; }
         std::vector<std::shared_ptr<StructAttribute>> &attributes() { return m_attributes; }
 
-        std::string to_string() const override { return "StructField(" + m_name + ", " + m_type + ")"; }
         std::string to_json() const override;
 
     protected:
@@ -532,7 +509,6 @@ namespace jcc
         const std::shared_ptr<TypeNode> &dtype() const { return m_dtype; }
         std::shared_ptr<TypeNode> &dtype() { return m_dtype; }
 
-        std::string to_string() const override { return "UnionField(" + m_name + ", " + m_dtype->to_string() + ")"; }
         std::string to_json() const override { return "{\"type\":\"union_field\",\"name\":\"" + json_escape(m_name) + "\",\"dtype\":" + m_dtype->to_json() + "}"; }
 
     protected:
@@ -559,7 +535,6 @@ namespace jcc
         const std::shared_ptr<Block> &block() const { return m_block; }
         std::shared_ptr<Block> &block() { return m_block; }
 
-        std::string to_string() const override { return "StructMethod(" + m_name + ", " + m_type + ")"; }
         std::string to_json() const override;
 
     protected:
@@ -588,7 +563,6 @@ namespace jcc
         const bool &packed() const { return m_packed; }
         bool &packed() { return m_packed; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -614,7 +588,6 @@ namespace jcc
         const bool &packed() const { return m_packed; }
         bool &packed() { return m_packed; }
 
-        std::string to_string() const override { return "UnionDefinition(" + m_name + ")"; }
         std::string to_json() const override;
 
     protected:
@@ -645,7 +618,6 @@ namespace jcc
         const std::shared_ptr<Block> &block() const { return m_block; }
         std::shared_ptr<Block> &block() { return m_block; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -676,7 +648,6 @@ namespace jcc
         const std::shared_ptr<Expression> &right() const { return m_right; }
         std::shared_ptr<Expression> &right() { return m_right; }
 
-        std::string to_string() const override { return "BinaryExpression(" + m_op + ", " + m_left->to_string() + ", " + m_right->to_string() + ")"; }
         std::string to_json() const override { return "{\"type\":\"binary_expression\",\"op\":\"" + json_escape(m_op) + "\",\"left\":" + m_left->to_json() + ",\"right\":" + m_right->to_json() + "}"; }
 
     protected:
@@ -698,7 +669,6 @@ namespace jcc
         const std::shared_ptr<Expression> &expression() const { return m_expression; }
         std::shared_ptr<Expression> &expression() { return m_expression; }
 
-        std::string to_string() const override { return "UnaryExpression(" + m_op + ", " + m_expression->to_string() + ")"; }
         std::string to_json() const override { return "{\"type\":\"unary_expression\",\"op\":\"" + json_escape(m_op) + "\",\"expression\":" + m_expression->to_json() + "}"; }
 
     protected:
@@ -719,7 +689,6 @@ namespace jcc
         const std::shared_ptr<Expression> &expression() const { return m_expression; }
         std::shared_ptr<Expression> &expression() { return m_expression; }
 
-        std::string to_string() const override { return "CastExpression(" + m_type + ", " + m_expression->to_string() + ")"; }
         std::string to_json() const override { return "{\"type\":\"cast_expression\",\"type\":\"" + json_escape(m_type) + "\",\"expression\":" + m_expression->to_json() + "}"; }
 
     protected:
@@ -737,7 +706,6 @@ namespace jcc
         const std::string &type() const { return m_type; }
         std::string &type() { return m_type; }
 
-        std::string to_string() const override { return "NullExpression(" + m_type + ")"; }
         std::string to_json() const override { return "{\"type\":\"null_expression\",\"type\":\"" + json_escape(m_type) + "\"}"; }
 
     protected:
@@ -757,7 +725,6 @@ namespace jcc
         const std::vector<std::shared_ptr<Expression>> &arguments() const { return m_arguments; }
         std::vector<std::shared_ptr<Expression>> &arguments() { return m_arguments; }
 
-        std::string to_string() const override;
         std::string to_json() const override;
 
     protected:
@@ -775,7 +742,6 @@ namespace jcc
         const std::string &value() const { return m_value; }
         std::string &value() { return m_value; }
 
-        std::string to_string() const override { return "LiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
 
     protected:
@@ -789,7 +755,6 @@ namespace jcc
         StringLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::StringLiteralExpression) {}
         virtual ~StringLiteralExpression() {}
 
-        std::string to_string() const override { return "StringLiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"string_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
     };
 
@@ -800,7 +765,6 @@ namespace jcc
         CharLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::CharLiteralExpression) {}
         virtual ~CharLiteralExpression() {}
 
-        std::string to_string() const override { return "CharLiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"char_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
     };
 
@@ -811,7 +775,6 @@ namespace jcc
         IntegerLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::IntegerLiteralExpression) {}
         virtual ~IntegerLiteralExpression() {}
 
-        std::string to_string() const override { return "IntegerLiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"integer_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
     };
 
@@ -822,7 +785,6 @@ namespace jcc
         FloatingPointLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::FloatingPointLiteralExpression) {}
         virtual ~FloatingPointLiteralExpression() {}
 
-        std::string to_string() const override { return "FloatingPointLiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"float_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
     };
 
@@ -833,7 +795,6 @@ namespace jcc
         BooleanLiteralExpression(const std::string &value) : LiteralExpression(value, NodeType::BooleanLiteralExpression) {}
         virtual ~BooleanLiteralExpression() {}
 
-        std::string to_string() const override { return "BooleanLiteralExpression(" + m_value + ")"; }
         std::string to_json() const override { return "{\"type\":\"boolean_literal_expression\",\"value\":\"" + json_escape(m_value) + "\"}"; }
     };
 
@@ -851,7 +812,6 @@ namespace jcc
         const std::shared_ptr<Expression> &expression() const { return m_expression; }
         std::shared_ptr<Expression> &expression() { return m_expression; }
 
-        std::string to_string() const override { return "ReturnStatement()"; }
         std::string to_json() const override { return "{\"type\":\"return_statement\"}"; }
 
     protected:
@@ -870,7 +830,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override { return "LetDeclaration()"; }
         std::string to_json() const override;
 
     protected:
@@ -890,7 +849,6 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
-        std::string to_string() const override { return "VarDeclaration()"; }
         std::string to_json() const override;
 
     protected:
@@ -920,7 +878,6 @@ namespace jcc
         const std::shared_ptr<ASTNode> &root() const { return m_root; }
         std::shared_ptr<ASTNode> &root() { return m_root; }
 
-        std::string to_string() const { return m_root->to_string(); }
         std::string to_json() const { return m_root->to_json(); }
 
     protected:

@@ -2,9 +2,9 @@
 // Info: J++ Transpiled Code                                        //
 // Type: C++-20                                                     //
 // Version: J++-dev                                                 //
-// Sources: ["tests/complex-struct.j"]                              //
+// Sources: ["tests/nested-struct.j"]                               //
 // Platform: independent                                            //
-// Date: 2024-01-29T23:42:41 +0000 GMT                              //
+// Date: 2024-02-11T20:24:51 +0000 GMT                              //
 // Copyright (C) 2023 Wesley C. Jones. All rights reserved.         //
 //==================================================================//
 
@@ -13,9 +13,9 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <memory>
 #include <cstring>
 #include <iostream>
-#include <cstdlib>
 
 typedef bool _bool;
 typedef int8_t _char;
@@ -79,8 +79,8 @@ typedef void *_routine;
 /* Begin Generic Structure Base Class */
 typedef _qword typeid_t;
 
-static std::map<typeid_t, _string> g_typenames_mapping = {{0, "_std::_io::Reader"}, {1, "_libmia::_Format::MIAHeader"}, {2, "_libmia::_Parser::Context"}};
-static std::map<_string, typeid_t> g_typenames_mapping_reverse = {{"_std::_io::Reader", 0}, {"_libmia::_Format::MIAHeader", 1}, {"_libmia::_Parser::Context", 2}};
+static std::map<typeid_t, _string> g_typenames_mapping = {{0, "_App::Color"}, {1, "_App::Point"}, {2, "_App::Line"}, {3, "_App::Rect"}, {4, "_App::Circle"}, {5, "_App::Text"}};
+static std::map<_string, typeid_t> g_typenames_mapping_reverse = {{"_App::Color", 0}, {"_App::Point", 1}, {"_App::Line", 2}, {"_App::Rect", 3}, {"_App::Circle", 4}, {"_App::Text", 5}};
 static std::map<std::string, _uintn> g_builtin_sizes = {{"_bool", 1}, {"_byte", 1}, {"_char", 1}, {"_word", 2}, {"_short", 2}, {"_dword", 4}, {"_int", 4}, {"_float", 4}, {"_double", 8}, {"_qword", 8}, {"_long", 8}, {"_string", 8}, {"_routine", 8}, {"_address", 8}};
 struct ReflectiveEntry {
     _string field_name;
@@ -88,7 +88,7 @@ struct ReflectiveEntry {
     _uintn count;
 };
 
-static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {{1, {{"_magic", "_dword", 1}, {"_version", "_word", 1}, {"_progid", "_byte", 16}, {"_camid", "_byte", 16}, {"_quality_index", "_byte", 1}, {"_colormode", "_word", 1}, {"_width", "_dword", 1}, {"_height", "_dword", 1}, {"_span", "_dword", 1}, {"_pxsize", "_byte", 1}, {"_compmode", "_byte", 1}, {"_usize", "_dword", 1}, {"_oid", "_byte", 16}, {"_pgid", "_byte", 16}, {"_timestamp", "_qword", 1}, {"_crc32", "_dword", 1}, {"_reserved", "_byte", 25}}}, {2, {{"_header", "_Format::_MIAHeader", 1}, {"_src", "_std::_io::_Reader", 1}}}};
+static std::map<typeid_t, std::vector<ReflectiveEntry>> g_reflective_entries = {{0, {{"_r", "_long", 1}, {"_g", "_long", 1}, {"_b", "_long", 1}, {"_a", "_int", 1}}}, {1, {{"_x", "_int", 1}, {"_y", "_int", 1}, {"_z", "_int", 1}}}, {2, {{"_start", "_Point", 1}, {"_end", "_Point", 1}, {"_color", "_Color", 1}}}, {3, {{"_tl", "_Point", 1}, {"_br", "_Point", 1}, {"_color", "_Color", 1}}}, {4, {{"_center", "_Point", 1}, {"_r", "_int", 1}, {"_color", "_Color", 1}}}, {5, {{"_tl", "_Point", 1}, {"_text", "_string", 1}, {"_color", "_Color", 1}}}};
 
 template <typeid_t T>
 class StructGeneric
@@ -199,109 +199,146 @@ template <typeid_t T>
 const typeid_t StructGeneric<T>::m_typeid;
 /* End Generic Structure Base Class */
 //==================================================================//
-// File: "tests/complex-struct.j" //
+// File: "tests/nested-struct.j" //
 //==================================================================//
 
 /* [] */
-namespace _std
+namespace _App
 {
-    /* [] */
-    namespace _io
+    /* Begin Structure _Color */
+    class _Color : public StructGeneric<0>
     {
-        /* Begin Structure _Reader */
-        class _Reader : public StructGeneric<0>
+    public:
+        _Color()
         {
-        public:
-            _Reader()
-            {
-                /* auto-generated attributes */
-                this->_set("_index", "");
-                this->_set("_index_names", "");
-                this->_set("_index_types", "");
-            }
+            /* auto-generated attributes */
+            this->_set("_index", "_r:_long=0,_g:_long=0,_b:_long=0,_a:_int=255,");
+            this->_set("_index_names", "_r,_g,_b,_a,");
+            this->_set("_index_types", "_long=0,_long=0,_long=0,_int=255,");
+        }
 
-        };
-        constexpr auto j__Reader_size = sizeof(_Reader);
-        /* End Structure _Reader */
+        _long _r = 0;
+        _long _g = 0;
+        _long _b = 0;
+        _int _a = 255;
+    };
+    constexpr auto j__Color_size = sizeof(_Color);
+    /* End Structure _Color */
 
-    }
+    /* Begin Structure _Point */
+    class _Point : public StructGeneric<1>
+    {
+    public:
+        _Point()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_x:_int=0,_y:_int=0,_z:_int=0,");
+            this->_set("_index_names", "_x,_y,_z,");
+            this->_set("_index_types", "_int=0,_int=0,_int=0,");
+        }
+
+        _int _x = 0;
+        _int _y = 0;
+        _int _z = 0;
+    };
+    constexpr auto j__Point_size = sizeof(_Point);
+    /* End Structure _Point */
+
+    /* Begin Structure _Line */
+    class _Line : public StructGeneric<2>
+    {
+    public:
+        _Line()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_start:_Point,_end:_Point,_color:_Color,");
+            this->_set("_index_names", "_start,_end,_color,");
+            this->_set("_index_types", "_Point,_Point,_Color,");
+        }
+
+        _Point _start;
+        _Point _end;
+        _Color _color;
+    };
+    constexpr auto j__Line_size = sizeof(_Line);
+    /* End Structure _Line */
+
+    /* Begin Structure _Rect */
+    class _Rect : public StructGeneric<3>
+    {
+    public:
+        _Rect()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_tl:_Point,_br:_Point,_color:_Color,");
+            this->_set("_index_names", "_tl,_br,_color,");
+            this->_set("_index_types", "_Point,_Point,_Color,");
+        }
+
+        _Point _tl;
+        _Point _br;
+        _Color _color;
+    };
+    constexpr auto j__Rect_size = sizeof(_Rect);
+    /* End Structure _Rect */
+
+    /* Begin Structure _Circle */
+    class _Circle : public StructGeneric<4>
+    {
+    public:
+        _Circle()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_center:_Point,_r:_int=0,_color:_Color,");
+            this->_set("_index_names", "_center,_r,_color,");
+            this->_set("_index_types", "_Point,_int=0,_Color,");
+        }
+
+        _Point _center;
+        _int _r = 0;
+        _Color _color;
+    };
+    constexpr auto j__Circle_size = sizeof(_Circle);
+    /* End Structure _Circle */
+
+    /* Begin Structure _Text */
+    class _Text : public StructGeneric<5>
+    {
+    public:
+        _Text()
+        {
+            /* auto-generated attributes */
+            this->_set("_index", "_tl:_Point,_text:_string=\"Your \\ntext here\",_color:_Color,");
+            this->_set("_index_names", "_tl,_text,_color,");
+            this->_set("_index_types", "_Point,_string=\"Your \\ntext here\",_Color,");
+        }
+
+        _Point _tl;
+        _string _text = "Your \ntext here";
+        _Color _color;
+    };
+    constexpr auto j__Text_size = sizeof(_Text);
+    /* End Structure _Text */
 
 }
 
-/* [] */
-namespace _libmia
+_int _Main(const std::vector<_string>& _args)
 {
-    /* [] */
-    namespace _Format
-    {
-        /* Begin Structure _MIAHeader */
-        #pragma pack(push, 1)
-        class _MIAHeader : public StructGeneric<1>
-        {
-        public:
-            _MIAHeader()
-            {
-                /* auto-generated attributes */
-                this->_set("_index", "_magic:_dword=0,_version:_word=0,_progid:std::vector<_byte>,_camid:std::vector<_byte>,_quality_index:_byte=0,_colormode:_word=0,_width:_dword=0,_height:_dword=0,_span:_dword=0,_pxsize:_byte=0,_compmode:_byte=0,_usize:_dword=0,_oid:std::vector<_byte>,_pgid:std::vector<_byte>,_timestamp:_qword=0,_crc32:_dword=0,_reserved:std::vector<_byte>,");
-                this->_set("_index_names", "_magic,_version,_progid,_camid,_quality_index,_colormode,_width,_height,_span,_pxsize,_compmode,_usize,_oid,_pgid,_timestamp,_crc32,_reserved,");
-                this->_set("_index_types", "_dword=0,_word=0,std::vector<_byte>,std::vector<_byte>,_byte=0,_word=0,_dword=0,_dword=0,_dword=0,_byte=0,_byte=0,_dword=0,std::vector<_byte>,std::vector<_byte>,_qword=0,_dword=0,std::vector<_byte>,");
-            }
-
-            _dword _magic = 0;
-            _word _version = 0;
-            _byte _progid[16];
-            _byte _camid[16];
-            _byte _quality_index = 0;
-            _word _colormode = 0;
-            _dword _width = 0;
-            _dword _height = 0;
-            _dword _span = 0;
-            _byte _pxsize = 0;
-            _byte _compmode = 0;
-            _dword _usize = 0;
-            _byte _oid[16];
-            _byte _pgid[16];
-            _qword _timestamp = 0;
-            _dword _crc32 = 0;
-            _byte _reserved[25];
-        };
-        #pragma pack(pop)
-        constexpr auto j__MIAHeader_size = sizeof(_MIAHeader);
-        /* End Structure _MIAHeader */
-
-    }
-
-    /* ["_libmia::_Format", "_std::io"] */
-    namespace _Parser
-    {
-        /* Begin Structure _Context */
-        class _Context : public StructGeneric<2>
-        {
-        public:
-            _Context()
-            {
-                /* auto-generated attributes */
-                this->_set("_index", "_header:_Format::_MIAHeader,_src:_std::_io::_Reader,");
-                this->_set("_index_names", "_header,_src,");
-                this->_set("_index_types", "_Format::_MIAHeader,_std::_io::_Reader,");
-            }
-
-            _Format::_MIAHeader _header;
-            _std::_io::_Reader _src;
-        };
-        constexpr auto j__Context_size = sizeof(_Context);
-        /* End Structure _Context */
-
-    }
-
+    return 0;
 }
 
 //==================================================================//
-// EOF: "tests/complex-struct.j"                                    //
+// EOF: "tests/nested-struct.j"                                     //
 //==================================================================//
+
+int main(int argc, char **argv)
+{
+    std::vector<_string> args(argv, argv + argc);
+    return _Main(args);
+}
 
 //==================================================================//
 // EOF: J++ Transpiled Code                                         //
 // SHA256:                                                          //
-// 4b9f51f583293791ce944b56bd4c67ace154e259cba719664187308d0c9f86fe //
+// 888a54c79a77ded9e69339232309959299a1b61a597b3f375c9342030854ab2c //
 //==================================================================//

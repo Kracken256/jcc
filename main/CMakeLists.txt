@@ -26,7 +26,7 @@ file(GLOB_RECURSE HEADERS "source/*.h" "source/*.hpp")
 
 add_executable(jcc ${SOURCES} ${HEADERS})
 add_dependencies(jcc libjcc)
-target_include_directories(jcc PRIVATE ../libjcc/include)
+target_include_directories(jcc PRIVATE ../libjcc/include ../libjcc/private)
 target_compile_options(jcc PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror -g -fPIC -Wno-error=unused-function)
 target_link_libraries(jcc PRIVATE ${JCC_LIB} ${CRYPTO_LIB} ${GMP_LIB} -static-libgcc -static-libstdc++ -pthread -static)
 

@@ -301,16 +301,16 @@ enum class LexerStateModifier
 };
 
 static std::vector<std::pair<const char *, unsigned int>> lexPunctuators = {
-    {"(", 1},  // left parenthesis
-    {")", 1},  // right parenthesis
-    {"{", 1},  // left brace
-    {"}", 1},  // right brace
-    {"[", 1},  // left bracket
-    {"]", 1},  // right bracket
-    {";", 1},  // semicolon
-    {",", 1},  // comma
-    {":", 1},  // colon
-    {".", 1},  // dot
+    {"(", 1}, // left parenthesis
+    {")", 1}, // right parenthesis
+    {"{", 1}, // left brace
+    {"}", 1}, // right brace
+    {"[", 1}, // left bracket
+    {"]", 1}, // right bracket
+    {";", 1}, // semicolon
+    {",", 1}, // comma
+    {":", 1}, // colon
+    {".", 1}, // dot
 };
 
 static std::vector<std::pair<const char *, unsigned int>> lexOperators = {
@@ -616,6 +616,13 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                 break;
             }
 
+            // Check for single line comment
+            if (current_char == ';' || current_char == '#')
+            {
+                state = LexerState::SingleLineComment;
+                break;
+            }
+
             // Check for multi line comment
             if (src_length - i >= 2 && current_char == '/' && source[i + 1] == '*')
             {
@@ -699,7 +706,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
                     case 1:
                         if (current_char == sep.first[0])
                         {
-                            if (src_length - i >= 2 && source[i+1] == ':')
+                            if (current_char == ':' && src_length - i >= 2 && source[i + 1] == ':')
                             {
                                 break;
                             }
