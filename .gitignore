@@ -4,3 +4,5 @@ build/
 bin/
 output/
 release/
+*.ast.json
+*.lex.json
