@@ -617,7 +617,7 @@ jcc::TokenList jcc::CompilationUnit::lex(const std::string &source)
             }
 
             // Check for single line comment
-            if (current_char == ';' || current_char == '#')
+            if (current_char == '#')
             {
                 state = LexerState::SingleLineComment;
                 break;

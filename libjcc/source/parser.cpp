@@ -334,7 +334,6 @@ std::string jcc::ConstDeclaration::to_json() const
 
 namespace jcc
 {
-
     static bool parse_struct_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool packed);
     static bool parse_class_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_enum_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
@@ -345,7 +344,7 @@ namespace jcc
     static bool parse_return_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node, bool functional);
     static bool parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-    static bool parse_expression_helper(jcc::TokenList &tokens, jcc::ExpNode &output);
+    static bool parse_expression_helper(jcc::TokenList &tokens, std::shared_ptr<jcc::Expression> &output);
     static bool parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
@@ -354,10 +353,10 @@ namespace jcc
     static bool parse_export_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_import_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
     static bool parse_volatile_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node);
-    static bool parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr_size, bool allow_default_value, std::shared_ptr<jcc::TypeNode> &node);
+    static bool parse_type(jcc::TokenList &tokens, std::shared_ptr<jcc::TypeNode> &node);
 }
 
-bool jcc::parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr_size, bool allow_default_value, std::shared_ptr<jcc::TypeNode> &node)
+bool jcc::parse_type(jcc::TokenList &tokens, std::shared_ptr<jcc::TypeNode> &node)
 {
     // [const] [ref] {typename} [[arr_size]|bitfield] [= default_value]
 
@@ -432,7 +431,7 @@ bool jcc::parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr
     }
 
     // check for bitfield
-    if (allow_bitfield && curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
+    if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
     {
         is_bitfield = true;
         tokens.pop();
@@ -458,7 +457,7 @@ bool jcc::parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr
     }
 
     // check for arr_size
-    if (allow_arr_size && curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
+    if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::OpenBracket)
     {
         // we can't have both bitfield and arr_size
         if (is_bitfield)
@@ -518,7 +517,7 @@ bool jcc::parse_type(jcc::TokenList &tokens, bool allow_bitfield, bool allow_arr
     }
 
     // check for default value
-    if (allow_default_value && curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
+    if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
     {
         tokens.pop();
         if (!parse_expression(tokens, default_value))
@@ -564,7 +563,6 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
         {
         case TokenType::Identifier:
             throw SyntaxError("Unexpected identifier: " + std::get<std::string>(curtok.value()));
-            break; // implement this
         case TokenType::Keyword:
             switch (std::get<jcc::Keyword>(curtok.value()))
             {
@@ -584,16 +582,7 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                     return false;
                 block->push(tmp);
                 break;
-            case Keyword::Let:
-                if (!parse_let_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-            case Keyword::Var:
-                if (!parse_var_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
+
             case Keyword::Const:
                 if (!parse_const_keyword(tokens, tmp))
                     return false;
@@ -617,28 +606,6 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
                 block->push(tmp);
                 break;
 
-            case Keyword::Typedef:
-                if (!parse_typedef_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-            case Keyword::Volatile:
-                if (!parse_volatile_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-
-            case Keyword::Class:
-                if (!parse_class_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-
-            case Keyword::Enum:
-                if (!parse_enum_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
             default:
                 throw SyntaxError("Unexpected keyword: " + std::string(lexKeywordMapReverse.at(std::get<jcc::Keyword>(curtok.value()))));
             }
@@ -646,36 +613,11 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
         case TokenType::Punctuator:
             switch (std::get<Punctuator>(curtok.value()))
             {
-            case Punctuator::OpenBrace:
-                throw SyntaxError("Unexpected opening brace");
-                break;
             case Punctuator::CloseBrace:
                 is_looping = false;
                 break;
-            case Punctuator::OpenParen:
-                throw SyntaxError("Unexpected opening parenthesis");
-                break;
-            case Punctuator::CloseParen:
-                throw SyntaxError("Unexpected closing parenthesis");
-                break;
-            case Punctuator::OpenBracket:
-                throw SyntaxError("Unexpected opening bracket");
-                break;
-            case Punctuator::CloseBracket:
-                throw SyntaxError("Unexpected closing bracket");
-                break;
             case Punctuator::Semicolon:
-                // ignore semicolons
                 tokens.pop();
-                break;
-            case Punctuator::Colon:
-                throw SyntaxError("Unexpected colon");
-                break;
-            case Punctuator::Comma:
-                throw SyntaxError("Unexpected comma");
-                break;
-            case Punctuator::Period:
-                throw SyntaxError("Unexpected period");
                 break;
 
             default:
@@ -692,7 +634,7 @@ static bool jcc::parse_structural_block(jcc::TokenList &tokens, std::shared_ptr<
             tokens.pop();
             break;
         default:
-            panic("Unknown token type: " + std::to_string((int)curtok.type()));
+            panic("Unknown token: " + curtok.to_string());
             break;
         }
     }
@@ -749,12 +691,17 @@ static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<
         {
         case TokenType::Identifier:
             throw SyntaxError("Unexpected identifier: " + std::get<std::string>(curtok.value()));
-            break; // implement this
         case TokenType::Keyword:
             switch (std::get<jcc::Keyword>(curtok.value()))
             {
             case Keyword::Import:
                 if (!parse_import_keyword(tokens, tmp))
+                    return false;
+                block->push(tmp);
+                break;
+
+            case Keyword::Export:
+                if (!parse_export_keyword(tokens, tmp))
                     return false;
                 block->push(tmp);
                 break;
@@ -775,12 +722,6 @@ static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<
                 block->push(tmp);
                 break;
 
-            case Keyword::Volatile:
-                if (!parse_volatile_keyword(tokens, tmp))
-                    return false;
-                block->push(tmp);
-                break;
-
             default:
                 throw SyntaxError("Unexpected keyword: " + std::string(lexKeywordMapReverse.at(std::get<jcc::Keyword>(curtok.value()))));
             }
@@ -788,38 +729,12 @@ static bool jcc::parse_functional_block(jcc::TokenList &tokens, std::shared_ptr<
         case TokenType::Punctuator:
             switch (std::get<Punctuator>(curtok.value()))
             {
-            case Punctuator::OpenBrace:
-                throw SyntaxError("Unexpected opening brace");
-                break;
             case Punctuator::CloseBrace:
                 is_looping = false;
                 break;
-            case Punctuator::OpenParen:
-                throw SyntaxError("Unexpected opening parenthesis");
-                break;
-            case Punctuator::CloseParen:
-                throw SyntaxError("Unexpected closing parenthesis");
-                break;
-            case Punctuator::OpenBracket:
-                throw SyntaxError("Unexpected opening bracket");
-                break;
-            case Punctuator::CloseBracket:
-                throw SyntaxError("Unexpected closing bracket");
-                break;
             case Punctuator::Semicolon:
-                // ignore semicolons
                 tokens.pop();
                 break;
-            case Punctuator::Colon:
-                throw SyntaxError("Unexpected colon");
-                break;
-            case Punctuator::Comma:
-                throw SyntaxError("Unexpected comma");
-                break;
-            case Punctuator::Period:
-                throw SyntaxError("Unexpected period");
-                break;
-
             default:
                 throw SyntaxError("Unexpected punctuator: " + std::string(lexPunctuatorMapReverse.at(std::get<Punctuator>(curtok.value()))));
             }
@@ -893,13 +808,13 @@ static bool jcc::parse_var_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::
 
     std::shared_ptr<TypeNode> type;
 
-    if (!parse_type(tokens, false, true, true, type))
+    if (!parse_type(tokens, type))
     {
         throw SyntaxError("Expected typename after var keyword");
         return false;
     }
 
-    node = std::make_shared<VarDeclaration>(type, name);
+    node = std::make_shared<VarDeclaration>(type, name, std::shared_ptr<NullExpression>());
 
     return true;
 }
@@ -937,19 +852,22 @@ static bool jcc::parse_let_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::
 
     std::shared_ptr<TypeNode> type;
 
-    if (!parse_type(tokens, false, true, true, type))
+    if (!parse_type(tokens, type))
     {
         throw SyntaxError("Expected typename after let keyword");
         return false;
     }
 
-    node = std::make_shared<LetDeclaration>(type, name);
+    node = std::make_shared<LetDeclaration>(type, name, std::shared_ptr<NullExpression>());
 
     return true;
 }
 
 static bool jcc::parse_const_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
+    /*
+        const varname[:typename] [= default value];
+    */
     if (tokens.size() < 2)
     {
         throw SyntaxError("Expected identifier after const keyword");
@@ -971,23 +889,67 @@ static bool jcc::parse_const_keyword(jcc::TokenList &tokens, std::shared_ptr<jcc
         throw SyntaxError("Expected typename after const keyword");
         return false;
     }
-    curtok = tokens.peek();
-    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Colon)
-    {
-        throw SyntaxError("Expected colon after const keyword");
-        return false;
-    }
-    tokens.pop();
 
     std::shared_ptr<TypeNode> type;
-
-    if (!parse_type(tokens, false, true, true, type))
+    curtok = tokens.peek();
+    if (curtok.type() == TokenType::Punctuator && std::get<Punctuator>(curtok.value()) == Punctuator::Colon)
     {
-        throw SyntaxError("Expected typename after const keyword");
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename after const keyword");
+            return false;
+        }
+
+        if (!parse_type(tokens, type))
+        {
+            throw SyntaxError("Expected typename after const keyword");
+            return false;
+        }
+
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected typename after const keyword");
+            return false;
+        }
+
+        curtok = tokens.peek();
+    }
+
+    std::shared_ptr<GenericNode> default_value;
+    if (curtok.type() == TokenType::Operator && std::get<Operator>(curtok.value()) == Operator::Assign)
+    {
+        tokens.pop();
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected default value after const keyword");
+            return false;
+        }
+
+        if (!parse_expression(tokens, default_value))
+        {
+            throw SyntaxError("Expected default value after const keyword");
+            return false;
+        }
+
+        if (tokens.eof())
+        {
+            throw SyntaxError("Expected semicolon after const keyword");
+            return false;
+        }
+
+        curtok = tokens.peek();
+    }
+
+    if (curtok.type() != TokenType::Punctuator || std::get<Punctuator>(curtok.value()) != Punctuator::Semicolon)
+    {
+        throw SyntaxError("Expected semicolon following const declaration");
         return false;
     }
 
-    node = std::make_shared<ConstDeclaration>(type, name);
+    tokens.pop();
+
+    node = std::make_shared<ConstDeclaration>(type, name, std::static_pointer_cast<Expression>(default_value));
 
     return true;
 }
@@ -2103,25 +2065,26 @@ std::map<std::string, uint32_t> operator_precedence = {
     // Add other custom operators here with their respective precedence
 };
 
-static bool jcc::parse_expression_helper(jcc::TokenList &tokens, jcc::ExpNode &output)
+static bool jcc::parse_expression_helper(jcc::TokenList &tokens, std::shared_ptr<jcc::Expression> &output)
 {
-    /// TODO: implement this
-    (void)tokens;
-    output = ExpNode(Token(TokenType::NumberLiteral, ""), {});
+    output = std::make_shared<FloatingPointLiteralExpression>(std::get<std::string>(tokens.peek().value()));
 
     tokens.pop();
+    (void)tokens;
 
     return true;
 }
 
 static bool jcc::parse_expression(jcc::TokenList &tokens, std::shared_ptr<jcc::GenericNode> &node)
 {
-    ExpNode output;
-    parse_expression_helper(tokens, output);
+    std::shared_ptr<Expression> expr;
+    std::cout << "Parsing expression" << std::endl;
+    if (!parse_expression_helper(tokens, expr))
+    {
+        return false;
+    }
 
-    auto item = std::make_shared<LiteralExpression>(std::get<std::string>(output.value.value()));
-
-    node = std::static_pointer_cast<GenericNode>(item);
+    node = std::static_pointer_cast<GenericNode>(expr);
 
     return true;
 }

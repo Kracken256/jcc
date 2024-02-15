@@ -330,7 +330,7 @@ namespace jcc
     {
     public:
         LetDeclaration(NodeType type = NodeType::LetDeclaration) : Definition(type) {}
-        LetDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::LetDeclaration), m_type(type), m_name(name) {}
+        LetDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name, const std::shared_ptr<Expression> &value) : Definition(NodeType::LetDeclaration), m_type(type), m_name(name), m_value(value) {}
 
         const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
         std::shared_ptr<TypeNode> &dtype() { return m_type; }
@@ -338,18 +338,22 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
+        const std::shared_ptr<Expression> &value() const { return m_value; }
+        std::shared_ptr<Expression> &value() { return m_value; }
+
         std::string to_json() const override;
 
     protected:
         std::shared_ptr<TypeNode> m_type;
         std::string m_name;
+        std::shared_ptr<Expression> m_value;
     };
 
     class VarDeclaration : public Definition
     {
     public:
         VarDeclaration(NodeType type = NodeType::VarDeclaration) : Definition(type) {}
-        VarDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::VarDeclaration), m_type(type), m_name(name) {}
+        VarDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name, const std::shared_ptr<Expression> &value) : Definition(NodeType::VarDeclaration), m_type(type), m_name(name), m_value(value) {}
 
         const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
         std::shared_ptr<TypeNode> &dtype() { return m_type; }
@@ -357,18 +361,22 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
+        const std::shared_ptr<Expression> &value() const { return m_value; }
+        std::shared_ptr<Expression> &value() { return m_value; }
+
         std::string to_json() const override;
 
     protected:
         std::shared_ptr<TypeNode> m_type;
         std::string m_name;
+        std::shared_ptr<Expression> m_value;
     };
 
     class ConstDeclaration : public Definition
     {
     public:
         ConstDeclaration(NodeType type = NodeType::ConstDeclaration) : Definition(type) {}
-        ConstDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name) : Definition(NodeType::ConstDeclaration), m_type(type), m_name(name) {}
+        ConstDeclaration(const std::shared_ptr<TypeNode> &type, const std::string &name, const std::shared_ptr<Expression> &value) : Definition(NodeType::ConstDeclaration), m_type(type), m_name(name), m_value(value) {}
 
         const std::shared_ptr<TypeNode> &dtype() const { return m_type; }
         std::shared_ptr<TypeNode> &dtype() { return m_type; }
@@ -376,11 +384,15 @@ namespace jcc
         const std::string &name() const { return m_name; }
         std::string &name() { return m_name; }
 
+        const std::shared_ptr<Expression> &value() const { return m_value; }
+        std::shared_ptr<Expression> &value() { return m_value; }
+
         std::string to_json() const override;
 
     protected:
         std::shared_ptr<TypeNode> m_type;
         std::string m_name;
+        std::shared_ptr<Expression> m_value;
     };
 
     ///=================================================================================================
