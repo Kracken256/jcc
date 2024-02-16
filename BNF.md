@@ -27,44 +27,39 @@ A work in progress.
 <identifier> ::= <identifier_symbol> | <identifier_symbol> <identifier_trailing>
 
 /* TODO */
-<typename> ::= <identifier>
+<array_type_suffix> ::= "[" <whitespace>? <constant_expr>? <whitespace>? "]"
+<bitfield_suffix> ::= ":" <whitespace>? <constant_expr>
 
-/* Struct declarations */
-<struct_declaration> ::= "struct" <whitespace> <identifier> <whitespace>? ";"
-
-/* Union declarations */
-<union_declaration> ::= "union" <whitespace> <identifier> <whitespace>? ";"
-
-/* Class declarations */
-<class_declaration> ::= "class" <whitespace> <identifier> <whitespace>? ";"
+<function_type> ::= <identifier> <whitespace>? "(" <whitespace>?  <function_parameters> 
+	<whitespace>? ")" <whitespace>? <function_return>?
+<struct_type> ::= <identifier>
+<union_type> ::= <identifier>
+<class_type> ::= <identifier>
+<enum_type> ::= <identifier>
+<null_type> ::= "null" | "nullptr"
+<types_list> ::= <function_type> | <struct_type> | <union_type> | <class_type> | <enum_type> | <enum_type> | <null_type>
+<typename> ::= "&"? <types_list> | "&"? <types_list> <array_type_suffix> | "&"? <types_list> <bitfield_suffix>
 
 /* TODO */
 <string_literal_char> ::= <letter> | <digit> | "[" | "]" | "{" | "}" | "(" 
 			| ")" | "<" | ">" | "'" | "=" | "|" | "." | "," | ";" | "-" 
-			| "+" | "*" | "?"
+			| "+" | "*" | "?" | "%"
 
 <string_literal_chars> ::= <string_literal_char> | <string_literal_chars> <string_literal_char>
 
 /* String literals are wrapped in matching " or ' characters */
-<string_literal> ::= "\"" <string_literal_chars> "\"" | "'" <string_literal_chars> "'"
+<string_literal> ::= "\"" <string_literal_chars>? "\"" | "'" <string_literal_chars>? "'"
 
 <integer_literal> ::= <digit> | <integer_literal> <digit>
 
 /* TODO */
 <floating_point_literal> ::= <integer_literal> "."? <integer_literal>
 
-/* TODO */
-<constant_expr> ::= <string_literal> | <integer_literal> | <floating_point_literal> | "null"
 
-/* TODO */
-<expression> ::= <identifier>
-
-/* TODO */
-<code_block> ::= "{}" 
 
 /* name: typename [= default] */
-<function_parameter> ::= <identifier> <whitespace>? ":" <whitespace>? <identifier> | <identifier> 
-	<whitespace>? ":" <whitespace>? <identifier> <whitespace>? "=" <whitespace>? <constant_expr>
+<function_parameter> ::= <identifier> <whitespace>? ":" <whitespace>? <typename> | <identifier> 
+	<whitespace>? ":" <whitespace>? <typename> <whitespace>? "=" <whitespace>? <constant_expr> | "this" | "&this"
 
 /* param1: type1 [= default 1], param2: type2 [= default 2], ... */
 <function_parameter_list> ::= <function_parameter> | <function_parameter_list> <whitespace>? "," 
@@ -75,9 +70,22 @@ A work in progress.
 /* : typename */
 <function_return> ::= ":" <whitespace>? <typename>
 
-/* func name([param1: type1 [= default 1], param2: type2 [= default 2], ...])[:return_ty[e]]; */
-<function_declaration> ::= "func" <whitespace> <identifier> <whitespace>? "(" <whitespace>? 
-	<function_parameters> <whitespace>? ")" <whitespace>? <function_return>? <whitespace>? ";"
+
+
+
+/* BEGIN: DECLARATIONS */ 
+
+/* Struct declaration */
+<struct_declaration> ::= "struct" <whitespace> <identifier> <whitespace>? ";"
+
+/* Union declaration */
+<union_declaration> ::= "union" <whitespace> <identifier> <whitespace>? ";"
+
+/* Class declaration */
+<class_declaration> ::= "class" <whitespace> <identifier> <whitespace>? ";"
+
+/* Enum declaration */
+<enum_declaration> ::= "enum" <whitespace> <identifier> <whitespace>? ";"
 
 /* let name: typename [= value]; */
 <let_declaration> ::= "let" <whitespace> <identifier> <whitespace>? ":" <whitespace>? 
@@ -92,6 +100,23 @@ A work in progress.
 /* const name: typename = value; */
 <const_declaration> ::= "const" <whitespace> <identifier> <whitespace>? ":" <whitespace>? 
 	<typename> <whitespace>? "=" <constant_expr> <whitespace>? ";"
+
+/* func name([param1: type1 [= default 1], param2: type2 [= default 2], ...])[:return_ty[e]]; */
+<function_declaration> ::= "func" <whitespace> <function_type> <whitespace>? ";"
+
+
+/* END: DECLARATIONS */
+
+
+
+/* TODO */
+<constant_expr> ::= <string_literal> | <integer_literal> | <floating_point_literal> | "null" | "default"
+
+/* TODO */
+<expression> ::= <identifier>
+
+
+/* BEGIN: DEFINITIONS */
 
 /* name: type [= default value]; */
 <struct_field> ::= <identifier> <whitespace>? ":" <whitespace>? <typename> | <identifier> 
@@ -116,11 +141,29 @@ A work in progress.
 
 <struct_body_item> ::= <struct_field_with_attributes> | <struct_method_with_attributes>
 
-<struct_body_items> ::= <struct_body_item> | <struct_body_items> <struct_body_item>
+<struct_body_items> ::= <struct_body_item> | <struct_body_items> <whitespace>? <struct_body_item>
 
 /* struct name { ... }; */
 <struct_definition> ::= "struct" <whitespace> <identifier> <whitespace>? "{" <whitespace>? <struct_body_items> <whitespace>? "}" <whitespace>? ";"
 
 /* union name { ... }; */
 <union_definition> ::= "union" <whitespace> <identifier> <whitespace>? "{" <whitespace>? <struct_body_items> <whitespace>? "}" <whitespace>? ";"
+
+
+
+/* name: typename [=value]; */
+<enum_entry> ::= <identifier> <whitespace>? ";" | <identifier> <whitespace>? ":" <whitespace>? <identifier> <whitespace>? ";" | <identifier> <whitespace>? ":" <whitespace>? <identifier> <whitespace>? "=" <constant_expr> <whitespace>? ";"
+<enum_entries> ::= <enum_entry> | <enum_entries> <whitespace>? <enum_entry>
+<enum_defintion> ::= "enum" <whitespace> <identifier> <whitespace>? "{" <whitespace>? <enum_entries> <whitespace>? "}" <whitespace> ";"
+
+
+/* END: DEFINITIONS */
+
+
+
+
+
+
+
+<structural_definition> ::= <struct_definition> | <union_definition>
 ```
